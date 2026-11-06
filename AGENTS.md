@@ -2,6 +2,7 @@
 
 ## Context by task
 
+- Before implementation, read the [common backend conventions](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/development/backend-conventions.md) and [Java/Spring conventions](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/development/java-spring-conventions.md). Use the accessible pipesor-docs checkout when available, distinguishing local changes from integrated main. Apply only the conventions relevant to this service; they do not add tables, integrations or permissions.
 - Use [README.md](README.md#development-and-verification) for setup, runnable commands and contribution policies. Add verified commands there when introducing application tooling; reference them rather than maintaining a second command list here.
 - For correlation logic, input validation or diagnostic handoff changes, consult [architecture](docs/architecture.md#service-relationships) and its current source model, including correlation dimensions and constraints. Read the linked ADR-015 for diagnosis orchestration boundaries. Follow references for the affected subject, not the entire documentation set for every edit.
 - For dependency selection, persistence, migrations or delivery work, consult the relevant sections of the [deployment contract](docs/deployment-contract.md). Its development baseline records the authorized version-selection policy; its data lifecycle records ownership and logical-reference requirements.
