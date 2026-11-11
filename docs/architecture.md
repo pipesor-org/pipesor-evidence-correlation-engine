@@ -1,5 +1,93 @@
 # Architecture consumption
 
+## Local implementation task — 2026-11-11
+
+Scope: start the NLP → Correlation → Recommendation path without adopting an
+unapproved receiver contract. Preserve execution isolation, evidence references
+and `correlationId`. Excluded: GitHub access, broker consumption, diagnosis/RAG,
+operational records/grants, foreign-table writes, delivery automation and cloud
+changes. This section is the task plan and verification record; the dated
+architecture summary below remains historical navigation.
+
+### Revalidated sources and requirements
+
+All checkouts were clean before work. `git ls-remote origin refs/heads/main`
+matched the following local HEADs on 2026-11-11; no neighboring checkout was
+modified. Correlation started on `main`, with HEAD and fetched `origin/main` both
+`5508c6dafe4ada970a7af03a04383e81d87dba71`, no local diff. Work uses the new local
+branch `feature/correlation-local-foundation`.
+
+| Source | Integrated revision | Requirement / approval limit |
+|---|---|---|
+| [Docs](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain.yml) | `65792190d2ee32f0721d22848cd62cee1fd0d630` | ADR-015/018 Accepted; Java/Spring and backend conventions integrated. DD-014 and `correlated_contexts` confirmed; model status does not approve REST or delivery. No local overlay. |
+| [Ingestion](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/blob/main/docs/deployment-contract.md) | `1066785908ff4a7f7f20b448df7154138ab093e0` | PR #15 integrated; owns capture/protection. Evidence v2 implemented; proposed Log/Event evidence identity is not approval by its owner. |
+| [NLP](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/docs/integration-contracts.md) | `1d6e54f149abc493aec24a2cd43eab192d620373` | PR #17 integrated; consumes Ingestion v2. Its Correlation v2 handoff remains explicitly candidate. |
+| [Pipeline](https://github.com/pipesor-org/pipesor-pipeline-service/blob/main/docs/architecture.md) | `84f7ac08eb4785c7ceaea2eb5761e43ca891b837` | Owns operational identities and authorization. Existing deterministic IDs do not prove existence or access. No agreed Correlation reference-validation API. |
+| [Log/Event](https://github.com/pipesor-org/pipesor-log-event-service/blob/main/README.md) | `d1f027756a4fa36b2817dc42e7e0dec5aa8f9a09` | Documentation only; owns `evidence_items`; no executable reference-validation contract. |
+| [Recommendation](https://github.com/pipesor-org/pipesor-recommendation-service/blob/main/README.md) | `754f9c64e69f764ae0eb5ad8000d2b53a1cd3fd2` | Documentation only; owns synchronous diagnostic orchestration. No accepted receiving URI/DTO. |
+| [Organization contribution policy](https://github.com/pipesor-org/.github/blob/main/CONTRIBUTING.md) and [PR template](https://github.com/pipesor-org/.github/blob/main/.github/PULL_REQUEST_TEMPLATE.md) | `36691787bb9d0c9fd6b78c76bfe82adffa0c1c87` | Current remote main checked through GitHub API. Small feature branch, reviewed PR policy, no direct push; this task authorizes local work only. |
+
+### Plan, affected surfaces and acceptance
+
+1. **Analysis completed:** actual repository configuration exposes the focused
+   `correlation_reviewer`; `explorer` performed read-only contract analysis.
+   Candidate semantics and missing physical support are recorded in the
+   [contract proposal](deployment-contract.md#local-contract-proposal-for-decision).
+2. **Independent implementation:** worker owns Maven/wrapper, non-web Spring
+   bootstrap/configuration, exact owned-table migration, infrastructure JPA
+   mapping and isolated persistence tests. The coordinator owns existing docs
+   and integration. Do not expose a repository as an authorized business use case.
+   There are no local callers to migrate. The implemented upstream caller is NLP
+   `ProcessEvidence` → `CorrelationHttpDelivery`; this increment does not change it.
+3. **Verification:** run wrapper build, PostgreSQL migration/mapping/transaction
+   checks and focused independent reviewer; record actual results in README.
+   Resolve material findings before handoff. No production or live-service tests.
+4. **Dependent implementation:** input resource/transformer, authorization,
+   reference validation, domain/application correlation command, durable receipt
+   and synchronous Recommendation adapter await the decisions below. Do not add
+   empty ports, permissive adapters, in-memory receipts or speculative classes.
+
+Observable acceptance for this independent slice: the build runs on Java 25;
+Flyway creates only the modeled owned table and its technical history;
+Hibernate validates it; UUID evidence arrays, incident/execution IDs,
+`correlation_id` and microsecond UTC `created_at` round-trip; distinct executions
+with identical summary/correlation coexist; duplicate PK insertion fails without
+overwriting; failed transactions roll back; required columns reject nulls with
+specific PostgreSQL causes. No REST listener or success response is provided.
+
+These checks do **not** prove tenant/reference isolation, input sanitization,
+correlation correctness or downstream receipt. Those are material acceptance
+criteria for the blocked business slice, alongside auth/scope rejection,
+message conflicts/concurrency, lost responses, unavailable references and failed
+handoff. DD-014 stores provenance through logical evidence IDs, not full NLP
+payloads. Business timestamps with nanoseconds must not be put into `created_at`
+or silently rounded as a substitute for their future preservation contract.
+
+No domain aggregate is introduced merely because a table exists. The JPA mapping
+is an infrastructure representation, not a safe input boundary or sanitizer.
+Only synthetic metadata is used in persistence checks; free-text summaries need
+agreed minimization before an application write path can be enabled.
+
+### Verification progress
+
+Independent implementation completed: exact migration and internal immutable JPA
+mapping, no business API or application command. Worker ran `./mvnw verify`
+successfully; five PostgreSQL 17.11 checks passed without skips. It reran the suite
+after adding assertions that Spring has no auto-configured Flyway bean and that
+Hibernate remains in validation mode; all five passed again. The effective
+Boot-managed set was inspected: Hibernate 7.4.13.Final, Flyway 12.4.0, PostgreSQL
+JDBC 42.7.14, JUnit 6.0.3 and Testcontainers 2.0.5. An isolated JAR invocation with
+empty datasource settings exited 1 as expected; no live connection was attempted.
+The coordinator checked the resulting Surefire report, `git diff --check` and 19
+local documentation links/anchors. See [README](../README.md#development-and-verification)
+for repeatable commands and limits. Business reception, sanitization, reference
+validation, durable idempotency and Recommendation delivery remain blocked only
+for their dependent slice; no contract proposal is adopted by these tests.
+The live `correlation_reviewer` completed its independent read-only review of
+build, mapping, migration, tests and documentation with no material findings;
+it inspected the Surefire evidence and ran `git diff --check`, without repeating
+the suite or claiming live-service integration.
+
 Consulted on 2026-11-06: `pipesor-org/pipesor-docs` full Git SHA **`c84ef3e4629fcb0c38315f32b641a5fb949e450d`**, using the clean local checkout (no uncommitted source overlay). Canonical model: `ey_aiops_ci_cd_diagnosis`, version `0.5.0-mvp-iac-alignment`, status `draft`. `evidence_correlation_engine` is a confirmed container with an independent repository under ADR-018; confirmed is a model status only.
 
 Architecture source links below follow `main`. The summary reflects the consulted revision recorded above; review it against subsequent accepted decisions before implementation.
