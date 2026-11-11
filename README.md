@@ -67,6 +67,55 @@ Follow the organization [contribution policy](https://github.com/pipesor-org/.gi
 
 ## Optional Codex setup
 
-Start Codex from this repository root so its [repository instructions](AGENTS.md) are discovered. Project configuration is in [.codex/config.toml](.codex/config.toml); [correlation_reviewer](.codex/agents/correlation-reviewer.toml) defines a focused reviewer. Review roles do not create separate sandbox permissions.
+Start Codex from this trusted repository root. The
+[task-based workflow](AGENTS.md#task-based-agent-workflow) follows the existing
+Pipeline/Ingestion pattern: bounded analysis, authorized implementation and
+independent review. Use the analyst when requirements or consequential decisions
+need research, rather than for every small fix.
 
-After changing instructions, start a fresh session and ask it to identify its active instruction sources. See the official [instruction-discovery guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md) and [subagent guide](https://learn.chatgpt.com/docs/agent-configuration/subagents). A successful TOML parse alone does not establish live discovery or reviewer execution.
+| Role | Model | Reasoning effort | Responsibility |
+|---|---|---|---|
+| Coordinator | gpt-6.1-sol | medium | Scope, integration, verification and completion. |
+| [service_analyst](.codex/agents/service-analyst.toml) | gpt-6.1-sol | high | Reconcile sources/approvals, compare decision options and define observable acceptance. |
+| Built-in worker/explorer | gpt-6.1-sol | high | Implement authorized work / answer narrow code questions. |
+| [correlation_reviewer](.codex/agents/correlation-reviewer.toml) | gpt-6.1-sol | high | Independently check execution isolation, provenance, ownership and synchronous handoff. |
+
+[Project configuration](.codex/config.toml) limits spawned threads to two,
+excluding the coordinator. Custom roles pin their own model/effort. For bounded
+worker/explorer tasks an explicit spawn may reduce effort to medium; use higher
+effort only for concrete complexity. These settings follow Pipeline/Ingestion,
+not a measured quality guarantee. Report any unavailable model or substitution.
+Research/review instructions do not create a separate read-only sandbox or new
+permissions; they inherit the parent's permissions. See the official
+[subagent guide](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+
+Example request:
+
+> Use service_analyst to compare the unresolved NLP receiver decisions with source
+> revisions, existing approvals, options and recommendations. Implement only ready
+> authorized work with worker; have correlation_reviewer independently challenge
+> acceptance and failure checks. Preserve local changes and continue independent work.
+
+After configuration changes, use a fresh session. Check TOML with the command in
+[development verification](#development-and-verification), then inspect discovery
+without invoking a model:
+
+```bash
+codex debug prompt-input 'List active repository instructions, specialist roles and authorization boundaries.'
+```
+
+Confirm the exact custom-role descriptions alongside worker/explorer; avoid
+publishing raw diagnostic output, which may contain local context. TOML parsing
+and prompt discovery do not certify live delegation. A live pilot must invoke
+the actual `service_analyst` in a fresh session, then independently review its brief.
+Do not label an explorer acting from copied instructions as that custom role.
+See also the official [instruction-discovery guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+
+Setup verification on 2026-11-11 (codex-cli 0.167.1): TOML syntax, required role
+fields, configured model/effort and two-thread limit passed. The prompt-input
+diagnostic discovered both exact custom-role descriptions alongside worker and
+explorer without a model invocation. It required execution outside the read-only
+sandbox to initialize local CLI state; no global trust, provider or permission
+configuration was changed. Live invocation of the new analyst is still unverified;
+the earlier correlation reviewer execution is not an analyst pilot. No application
+code changed in this agent-setup increment, so the backend suite was not repeated.

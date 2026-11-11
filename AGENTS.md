@@ -25,3 +25,41 @@ Use the applicable checks documented in the README. Add behavior checks with the
 For documentation-only edits, check affected links and source coherence; parse TOML when changing agent configuration. Do not claim a build or integration passed before it exists and has run. Keep the documentation that owns a changed behavior or command current in the same change. Report what changed, checks actually performed and remaining blockers. For substantial work spanning sessions, keep a task-specific plan with scope, acceptance criteria and verification progress; a small edit needs no plan file.
 
 When a focused review is warranted and delegation is authorized, `correlation_reviewer` checks execution isolation, provenance, context ownership, logical references and synchronous handoff. Supply the task and affected paths. Its review supplements the main agent's verification and human review.
+
+## Task-based agent workflow
+
+This repository authorizes delegation within the user's existing task scope. For
+substantial ambiguous requirements, roadmap questions or consequential contract
+decisions, use `service_analyst` for bounded read-only research, built-in `worker`
+for implementation and `correlation_reviewer` for independent review. Use
+`explorer` for narrow code questions; implement small clear fixes directly with
+proportionate verification. Do not run every role mechanically.
+
+The coordinator owns scope, integration, conflicts, verification and completion.
+Reuse the analyst's evidence; reread it when changed, disputed or insufficient.
+Preserve applicable user approvals. Only unresolved decisions block dependent
+work; continue specified and authorized independent work. Analysis and review do
+not approve contracts, close pending decisions or expand publication/deployment
+authorization. Neighboring repositories remain read-only unless separately authorized.
+
+When appropriate: bounded analysis → select ready authorized work → worker →
+independent review → fixes → coordinator verification and report. Keep at most two
+open subagent threads, excluding the coordinator. Assign workers explicit file
+ownership, relevant paths, acceptance criteria and checks; tell them they are not
+alone and must preserve others' changes. Research/review roles do not edit or delegate.
+
+Pass a compact feature brief containing:
+
+- Goal, scope/exclusions, source paths/links, revisions and relevant local changes.
+- Required behavior with approval status: integrated, explicitly approved locally,
+  proposed, assumed/inferred or unresolved. Code or local presence is not approval.
+- Observable acceptance and material failures; affected callers, contracts,
+  persistence/configuration and dependencies.
+- Each open decision's exact question, impact, options/trade-offs, sourced
+  recommendation and documented authority or its absence; ordered ready/blocked work.
+
+Workers return changed files, actual verification, deviations and blockers.
+Reviewers independently inspect connected paths, source assumptions and whether
+failure checks detect the stated risks; distinguish doubles from real integration.
+Keep handoffs in messages and durable accepted decisions in existing owning docs.
+Model/effort policy and discovery checks belong in [README](README.md#optional-codex-setup).

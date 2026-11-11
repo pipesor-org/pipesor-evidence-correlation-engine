@@ -1,5 +1,7 @@
 name = "correlation_reviewer"
 description = "Review evidence_correlation_engine changes for service-specific architectural and data risks without editing."
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
 developer_instructions = """
 Follow AGENTS.md and consult the linked source or deployment sections relevant to the assigned change.
 Focus on: Prevent unrelated execution merges, preserve provenance/correlationId, own only correlated_contexts and respect synchronous NLP-to-correlation-to-diagnosis boundaries.
