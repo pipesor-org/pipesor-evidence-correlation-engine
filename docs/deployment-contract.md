@@ -2,7 +2,7 @@
 
 **Status: readiness record; not approved for IaC consumption or deployment.** Prepared for PD-035. [Architecture consumption](architecture.md) records the consulted source revision `c84ef3e4629fcb0c38315f32b641a5fb949e450d`, model IDs, applicable ADRs and committed PD-033–036. ADR-019 governs the current MVP alignment.
 
-**Documented fact** means recorded in those sources/policies, not proven implementation or independent approval evidence. **Proposal** requires acceptance; **Unknown** remains pending. No application images, endpoints, credentials or migrations are implemented in this service increment. IaC contains infrastructure preparation; provisioning is not evidenced here.
+**Documented fact** means recorded in those sources/policies, not proven implementation or independent approval evidence. **Proposal** requires acceptance; **Unknown** remains pending. The 2026-11-11 local increment introduces only build/bootstrap and the modeled owned-table persistence foundation; see [task scope](architecture.md#local-implementation-task--2026-11-11) and [verification](../README.md#development-and-verification). No receiving endpoint, image delivery, credentials or cloud resources are implemented. IaC contains infrastructure preparation; provisioning is not evidenced here.
 
 ## Identity and runtime
 
@@ -16,7 +16,19 @@
 
 User direction recorded on 2026-11-06 retains the installed Java 25.0.4.1, Python 3.14.8, Docker 29.9.3 and Git 2.55.0. Java services use Maven (installed: 3.10.0); Azure CLI 2.92.0 is available for separately authorized operations. Select the latest stable dependency versions compatible with that baseline, and pin them when application build/dependency files are introduced. Framework and transitive dependency compatibility must be checked together; availability on this workstation is not container/CI verification. Python dependencies belong in isolated project environments.
 
-This session direction supplements the consulted architecture revision; it does not close PD-032's identity/hash choices or PD-035's base-image and delivery requirements. No application build files are introduced by this documentation update.
+This session direction supplements the consulted architecture revision; it does not close PD-032's identity/hash choices or PD-035's base-image and delivery requirements.
+
+The local foundation selects Spring Boot **4.1.2**, the latest stable version in
+Maven Central checked on 2026-11-11 (4.2.0-RC2 is a preview). Its
+[system requirements](https://docs.spring.io/spring-boot/system-requirements.html)
+support Java 25 and Maven 3.10.0. Use its dependency management for the compatible
+Hibernate, Flyway, PostgreSQL driver, JUnit and Testcontainers versions; the parent
+pins that dependency set. Maven Wrapper 3.3.4 pins Maven 3.10.0. These are local
+build choices, not a container baseline or deployment approval. Runtime is non-web
+and Flyway is disabled by default; isolated tests explicitly enable migrations.
+There is no public/internal business listener, auth configuration or permissive
+adapter. Enabling the receiver requires the decisions in the
+[contract proposal](#local-contract-proposal-for-decision).
 
 ## Integrated infrastructure baseline
 
@@ -101,3 +113,152 @@ Before IaC consumes this contract, provide:
 4. The applicable independent environment promotion approvals and separate authorization for any infrastructure action. Contract approval alone does not authorize deployment.
 
 **Approval evidence today: none for this service's delivery contract.** ADRs retain their recorded Accepted status; missing individual acceptance records remain PD-014. This document is sufficient to expose gaps while repository initialization proceeds; it is insufficient to claim deployability.
+
+## Local contract proposal for decision
+
+**Candidate, 2026-11-11; not adopted or implemented.** Source revisions and task
+scope are in [architecture](architecture.md#local-implementation-task--2026-11-11).
+No new agreement was found that closes PD-010/031/034 for this receiver. The
+independent table/build increment does not accept the following proposals.
+
+### NLP → Correlation: existing producer and proposed receiver
+
+The implemented NLP caller uses HTTPS `POST /internal/v1/processed-evidence`,
+`application/json; charset=utf-8`, body `contract_version: "2.0"`. The path version
+and body version are distinct. See the exact candidate body in
+[NLP integration contracts §3](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/docs/integration-contracts.md#3-correlation-handoff)
+and its serializer in
+[correlation_http.py](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/src/pipesor_nlp_log_processor/infrastructure/correlation_http.py).
+There is no Correlation receiver yet.
+
+| Surface | Producer behavior / proposed receiver requirement |
+|---|---|
+| Identity and tracing | `message_id` UUID text equals `Idempotency-Key`; `correlation_id` opaque text equals `X-Correlation-ID`. Valid W3C `traceparent`/`tracestate` are technical headers, never identity or authorization. Reject mismatches without echoing values. |
+| Authentication | Bearer token; NLP proposes Entra workload identity. Receiver must validate issuer, audience, authorized service/role and trusted resource-scope binding. Exact values and authority supplying tenant/capture scope remain unagreed; no allow-all mode. |
+| Capture / operational context | Preserve `source`; `capture_context` tenant UUID, account/installation decimal strings and `scope_revision`; repository/workflow decimal strings; run decimal string, positive attempt, status/conclusion; commit SHA; nullable `service`/`environment`. Full tuple must agree with verified operational references. |
+| Logical IDs | Preserve `pipeline_id`, `execution_id`, `incident_id`, `evidence_id` as UUIDs. Pipeline IDs already have integrated deterministic rules; do not regenerate or change them here. NLP's computed evidence UUIDv5 is still an owner-level agreement gap with Log/Event. None proves existence or access. |
+| Times / provenance | Preserve original UTC RFC3339 `occurred_at` and `source_updated_at` including up to nine fractional digits. Keep external IDs as strings; `sequence` may exceed 32 bits. `created_at` is an independent technical insertion time, not either source timestamp. |
+| Processed evidence | `stage`, optional `job`, nullable `sequence`, `sanitized_summary`, `sanitized_content`, `template`. Protected/minimized input only; template is not a confirmed error cause. The prefix `sanitized_` is not proof of safe content. No raw logs, credential fields or arbitrary artifacts. |
+| Compatibility / limits | Proposed: exact supported `contract_version=2.0`, unknown additive optional fields ignored consistently with NLP, unsupported major rejected. Required-field type/meaning changes are breaking. Request bytes, field/collection sizes and total processing timeout require explicit agreed numeric limits; no unbounded public parser is enabled meanwhile. |
+
+The published
+[NLP fixture](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/tests/fixtures/ingestion-evidence-v2.json)
+is an **Ingestion input fixture**, not a Correlation request. It includes
+`123456789`/`987654321` fractional nanoseconds, external IDs larger than signed
+64-bit and `sequence=4294967303`. Future receiver checks must pass that artifact
+through the actual NLP transformation/serializer and compare exact resulting
+IDs, strings, nullability, timestamps and provenance. This increment has no
+receiver parser and does not claim fixture interoperability validation.
+
+### Proposed completion and recovery semantics
+
+Recommendation: retain synchronous processing. `200 {"status":"accepted",
+"message_id":"<original>"}` means the authorized context was reference-validated,
+its sanitized snapshot and receipt committed durably, and Recommendation
+confirmed the same operation according to its agreed durable reception contract.
+It does not mean a diagnosis is ready. A local commit alone is insufficient.
+
+`200 {"status":"duplicate","message_id":"<original>"}` means the same scoped
+message and semantically identical content already satisfied **all** of that
+commitment. A pending receipt is not a duplicate success. Reuse with different
+content is `409` with a stable `message_conflict` code, no payload values. Scope
+is the trusted authenticated producer/resource partition plus `message_id`;
+the exact encoding and persistence key must be approved, not derived from an
+untrusted tenant field. Replays must be authorized again before any result is
+revealed.
+
+This needs a durable state machine: prepare snapshot/receipt atomically; send the
+same operation/snapshot to Recommendation synchronously; persist delivery
+confirmation; only then return success. If the local response is lost after
+confirmation, replay returns duplicate. If Recommendation commits but its
+response is lost, replay must use its stable idempotency key and recover its
+durable result before marking local delivery. If local preparation commits and
+Recommendation fails, return retryable failure and retain pending state; replay
+resumes that same snapshot rather than creating another. Concurrent requests
+must converge through an approved database uniqueness/claim strategy, not a
+process-local lock. Neither service may infer exactly-once HTTP delivery.
+
+The current seven-column `correlated_contexts` table cannot express this state:
+there is no message key, request digest, trusted scope or delivery phase. Proposed
+model direction: a separate Correlation-owned receipt if snapshots may contain
+several input messages; unique trusted scope/producer/message key, canonical
+content digest/version, snapshot ID and preparation/delivery state with technical
+times. This is **not** a migration specification or permission to create a table.
+The owning model must first settle physical fields, safe replay/provenance
+material, atomicity, retention, concurrency and recovery. Do not store raw input
+JSON or add it to `correlated_contexts`. Hashing a message does not preserve its
+provenance or make sensitive text safe. Canonical comparison must include all
+significant context/provenance/processed content, exact source time precision and
+null/absent semantics, excluding authentication tokens and technical trace headers.
+Canonicalization/hash format is a required agreement, not chosen in this increment.
+
+Proposed errors, compatible with NLP's current error classification:
+
+| Condition | Proposed result and obligation |
+|---|---|
+| Invalid body/header, incompatible version | `400`, stable code and field paths only; no durable acceptance. |
+| Missing/invalid service token | `401`, generic response; NLP abandons current message and stops consumption. |
+| Unauthorized service or resource scope | `403`, generic response without reference-existence disclosure; NLP abandons/stops. |
+| Same scoped ID, different content | `409 message_conflict`; permanent rejection, never duplicate. |
+| Temporarily unavailable or not-yet-arrived references | `503 references_unavailable`, no success and no fabricated records. Requires an actual approved way to validate references. |
+| Authoritatively inconsistent references | `400 reference_mismatch` after authorization, no values; no snapshot. Distinguishing absence from inconsistency requires the reference contract. |
+| Dependency/network/commit/delivery failure | `503`, safe stable code. Pending durable preparation is resumed as above; an ambiguous DB commit is resolved by its stable key. |
+| Capacity or rate limit | `429`, safe code; bounded numeric `Retry-After` only within the caller deadline. Numeric budgets remain PD-035 inputs. |
+
+NLP retries timeouts, connection errors, `429` and `5xx`; other `4xx` are permanent
+except its special `401`/`403` stop behavior. Thus a reference that may simply be
+late must not receive a permanent not-found response. A never-created reference,
+retry horizon and safe operational disposition require a separate explicit
+policy; an infinite retry loop is not proposed. No extra broker or polling
+relationship is introduced.
+
+### Correlation → Recommendation proposal
+
+Proposed single synchronous submission on the existing
+`rel_correlation_recommendation` (the diagnostic-api relationship is its component
+projection, not a second delivery): `POST /internal/v1/correlated-contexts`, JSON
+`contract_version: "1.0"`, stable `operation_id`, trusted authorized scope envelope,
+and `context` containing the seven snapshot fields (`id`, `incident_id`,
+`execution_id`, `evidence_ids`, `summary`, `correlation_id`, `created_at`). The URI
+and envelope are proposals, not an endpoint discovered in Recommendation. The
+scope supplier/encoding must be jointly specified; a body tenant ID is not proof.
+For an initial minimal context, `summary` should contain only agreed safe
+operational metadata, with no copied excerpts or template-based diagnosis.
+Whether Recommendation additionally requires processed signals/source timestamps
+must be decided before adopting this minimum; no evidence lookup API is implied.
+
+Proposed headers: Entra Bearer identity for a Recommendation-specific audience and
+role, `Idempotency-Key=operation_id`, original `X-Correlation-ID` and W3C trace
+context. Recommendation must enforce resource scope and durably recognize the
+operation/content before returning `200` with `status=accepted|duplicate` and the
+same `operation_id`/`context_id`. This receipt means durable context reception,
+not completed diagnosis. A pending/unconfirmed request cannot be declared
+accepted by Correlation. Conflicting content is `409`; authentication and
+temporary/permanent failures follow the same distinctions above. Timeout means
+unknown result, so recovery resends the same operation, never a fresh diagnosis
+request ID. Exact DTO, reception behavior and receipt storage belong to
+Recommendation under PD-010/034 and must be implemented there by its owner.
+
+### Decisions needed and responsible parties
+
+Each row is a specific decision; none is approval by analysis or by this local
+implementation. Jhon Galvez and Ramiro Guzman are the documented contractual
+authority for PD-010/031/034/035; the one-versus-both approval rule is unspecified.
+
+| Exact question / impact | Options and recommendation | Authority / dependent work |
+|---|---|---|
+| Accept NLP's v2 route/body/headers and the completion/recovery semantics above? Without this, broker completion can lose downstream work. | Local durable acceptance with deferred delivery, or synchronous confirmed delivery plus recoverable receipt. Recommend the latter to preserve the canonical synchronous flow. | PD-034, Jhon/Ramiro; NLP and Correlation owners coordinate. Blocks receiver, not owned-table foundation. |
+| Where will scoped message identity, content comparison and delivery state live, with what physical constraints, precision and retention? | Evolve snapshot or separate owner receipt. Recommend a separate receipt if grouping is selected; first approve source-model evolution and canonical comparison. | PD-031/034/035 and model owner. Blocks durable receipt/acceptance; this task cannot modify docs repository. |
+| How can Correlation verify authorized tenant/repository/run/attempt/incident/evidence membership through the existing flow, including not-yet-arrived data? | Approved owner-backed proof carried by the existing exchange, or an explicitly approved architecture/contract change if new calls are needed. Recommend retaining current relationships and specifying a verifiable carried proof if feasible; do not invent it. Then choose temporary rejection versus durable pending reconciliation. | PD-031 Jhon/Ramiro for contract; Pipeline and Log/Event owners implement their portions. No usable validation contract exists today. |
+| Does Log/Event accept the UUIDv5 evidence-ID rule already computed by NLP? | Adopt the proposed rule or agree an owner-issued identity through the declared exchange. Recommend confirming the compatible rule with Log/Event; no ID changes here. | Log/Event owner, PD-031/032/033; no owner approval found. |
+| Accept the proposed Recommendation request, minimal information, scope binding and durable response? | Self-contained safe snapshot versus a reference requiring an agreed retrieval relationship. Recommend a single self-contained submission; settle needed signals and idempotency first. | PD-010/034 Jhon/Ramiro with Recommendation owner. Blocks synchronous adapter/recovery tests. |
+| What is the first correlation unit and what causes delivery/version closure? | One verified evidence item per snapshot, or multi-evidence accumulation with explicit version/closure. Recommend deciding the one-item first slice; no window or score. | Architecture lists dimensions only; algorithm approval authority not identified. Contract approval alone must not be assumed to assign it. |
+| What issuer/audiences/roles and trusted resource-scope evidence, payload limits and timeout/retry horizons apply? | Agree explicit fail-closed values versus keep integration disabled. Recommend explicit values before enabling REST; no permissive defaults. | PD-034/035 Jhon/Ramiro with security/backend/IaC owners; not settled by Entra as a technology choice. |
+
+Concrete examples to decide the correlation rule: identical template/commit/time
+across different tenants, repositories, runs or attempts must remain separate;
+two distinct messages in one verified execution may either produce two snapshots
+or one explicitly versioned snapshot; a repeated identical message is receipt
+recovery, not new evidence; a late distinct message must have an agreed new-version
+or new-snapshot outcome. No timestamp window, score, severity inference or close
+condition is implemented here.
