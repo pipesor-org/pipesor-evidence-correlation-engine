@@ -88,6 +88,255 @@ build, mapping, migration, tests and documentation with no material findings;
 it inspected the Surefire evidence and ran `git diff --check`, without repeating
 the suite or claiming live-service integration.
 
+### Local continuation after PR #4 — 2026-11-11
+
+[PR #4](https://github.com/pipesor-org/pipesor-evidence-correlation-engine/pull/4)
+is merged at `4b8c226d3f88812f9ec42f7154d7fd468421041f`. GitHub metadata and
+remote `main` were revalidated; the initial local HEAD matched and the working
+tree was clean. No local changes required recovery or removal. The PR discussion
+and review lists were empty; merge is not separate contract approval evidence.
+Docs remote `main` still matches `65792190d2ee32f0721d22848cd62cee1fd0d630`.
+The live `service_analyst` inspected the clean neighboring source checkouts listed
+above, which retain those revisions, and found no new receiving, reference or
+handoff agreement. Neighboring repositories remain read-only.
+
+The next required decision is PD-031: **how will Correlation verify authorized
+tenant/capture, repository/workflow/run/attempt, incident and evidence membership,
+including records that have not yet arrived?** A verifiable owner-backed proof
+carried through the existing exchange is the recommendation to investigate;
+new calls require an explicit architectural agreement. Neither option has an
+approved mechanism. The documented contractual authorities are Jhon Galvez and
+Ramiro Guzman; the one-versus-both rule remains unspecified. Pipeline and Log/Event
+own their portions. See the existing [decision table](deployment-contract.md#decisions-needed-and-responsible-parties)
+for options and the separate reception, correlation-unit, recovery and handoff
+decisions. This analysis does not close them or reopen the integrated boundaries.
+
+The subsequent user-requested [PD-031 proposal](deployment-contract.md#pd-031-decision-proposal-owner-verified-references)
+examines that recommendation's feasibility: the existing graph has no path for
+post-commit owner confirmations to reach NLP/Correlation. It therefore proposes
+two owner validation queries, conditional on an explicit architectural amendment,
+with trusted machine scope and source-item binding still to be agreed. This is
+a proposal update, not approval of new relationships or a claim of implemented
+reference validation. Documentation review checks source coherence, affected
+links and whitespace; no application behavior changes in this proposal increment.
+The analyst challenged feasibility against the existing graph and owner models.
+Independent review identified an incorrect same-pipeline requirement for
+VERIFICATION; the proposal was corrected to preserve accepted cross-pipeline
+verification and require the applicable authorization for both resources.
+All 32 local documentation links/anchors and `git diff --check` passed. Maven
+was not repeated for this documentation-only increment; the seven-test result
+below belongs to the preceding snapshot checks.
+
+The subsequent [data-readiness assessment](deployment-contract.md#data-readiness-assessment-for-the-first-correlation-increment)
+checks actual upstream code against the minimum need rather than assuming every
+missing historical field is a defect. It corrects the proposal's stale statement
+about Ingestion's already approved file authority, separates minimum membership
+from stronger historical attestation, and records an isolated reproduction of
+mutable NLP templates under broker reprocessing. No production code, neighbor
+repository or accepted contract changes in this assessment.
+The independent reviewer reported no material findings in the final assessment;
+35 local documentation links/anchors and `git diff --check` passed. Neighboring
+working trees remain clean. No application suite or live integration was rerun
+for these documentation changes.
+
+### Gap remediation: locally adopted scope and progress
+
+User direction following the assessment authorizes local remediation in this
+service and, where required for replay/contracts/model documentation, in NLP and
+`pipesor-docs`. Publication, merge, deployment and changes to other neighboring
+services remain outside this task. Existing changes are preserved.
+
+Explicitly adopted in this session:
+
+- Define multi-evidence grouping before enabling the business flow; the proposed
+  one-independent-snapshot-per-evidence slice was not selected.
+- Group by trusted machine scope, exact execution/attempt and automatic ORIGIN
+  incident. Distinct verified evidence expands an immutable cumulative revision;
+  replay of a member does not create a new revision. No time window, similarity
+  matching, silence-based closure or assertion of complete run coverage.
+- Separate stable protected source comparison from mutable NLP enrichment and
+  retain the first accepted result for the same message. Changed source under
+  the same scoped message ID must still conflict. NLP gains no durable store.
+
+Implementation plan and acceptance:
+
+1. Worker implements and tests only the grouping domain rule locally. Immutable
+   memberships/revisions, deduplication of evidence membership and rejection of
+   crossed scope/execution/incident must hold. The opaque scope is supplied by a
+   future trusted boundary; constructing it proves no authorization or existence.
+   Domain output is not yet a persisted snapshot or a delivery acknowledgement.
+2. The overlap analysis does not justify a new NLP digest or wire field for the
+   demonstrated template variation. Specify receiver comparison over existing
+   significant protected fields, separate mutable `template`, and freeze/recover
+   the accepted result. Proving original bytes hidden by sanitization is a
+   stronger guarantee, not an implementation prerequisite. No NLP parser change,
+   new cache or source hash is included in this increment.
+3. Record approved local semantics in owning documentation without marking
+   PD-010/031/034 globally closed or inventing schema fields. Group/head/receipt
+   physical representation, per-source tracing into a group and Recommendation
+   ordering/receipt behavior require a concrete agreement before persistence and
+   handoff. Existing seven-column snapshots cannot provide those guarantees alone.
+4. Independent review and applicable README checks; report source/behavior tests
+   separately from live owner interoperability. Reference validation, scoped
+   machine authorization and safe final disposition remain dependent work.
+
+No receiving endpoint, business persistence command or migration is included in
+the domain-only grouping increment. Worker implemented `CorrelationGroup` and
+five behavior checks. `./mvnw verify` passed 12 tests (five domain and seven
+isolated PostgreSQL), with zero failures, errors or skips. The coordinator
+inspected both Surefire reports; independent review found no material findings
+in the domain/tests and checked whitespace. No external validation, receipt or
+revision delivery behavior is claimed. The local approvals were also recorded
+in `pipesor-docs/docs/architecture/pending-decisions.md` with PDs still open;
+no architecture/domain model or generated artifact was changed.
+
+### Durable-state reuse audit and proposal
+
+The next user request asked whether durable groups, revisions or receipts already
+exist and whether the proposed data would duplicate upstream information. The
+analyst and coordinator checked the integrated persistent model/decisions, local
+mapping/migration/domain, Pipeline receipts, Ingestion ledger and Recommendation
+version semantics; the local Docs pending-register overlay was inspected
+separately and does not approve a physical model.
+
+The [durable grouping proposal](deployment-contract.md#durable-grouping-proposal-after-the-reuse-audit)
+reuses `correlated_contexts` for revisions and its evidence array for membership.
+It proposes only a group identity/locking row, per-message receipts and a snapshot
+association. Revision/head are derived; delivery confirmation is a distinct
+group pointer so snapshots remain immutable. No revision/membership table,
+separate operation UUID, NLP cache/hash or upstream-owner writes are proposed.
+The receipt still needs the individual evidence reference and original message
+trace; a cumulative snapshot or irreversible fingerprint cannot reconstruct them.
+
+This is a reviewable proposal, not approval or implementation of schema, ordering,
+private comparison encoding, downstream receipt or migration/backfill policy.
+The recommended delivery gate and monotonic confirmation semantics remain for
+decision. Snapshot reference growth, retention and the exact safe downstream
+payload are explicit limits/gates. Independent review identified a stale earlier
+receipt-state description; it now refers to the proposed group confirmation
+pointer instead of per-receipt delivery state. No other material findings were
+reported. Documentation checks passed: 40 local
+links/anchors and `git diff --check`. No application tests or DDL were run for
+this documentation-only proposal.
+
+### Approved durable storage increment — implementation plan
+
+The user subsequently approved the concrete reuse proposal and authorized work
+through the next material decision. This approval now covers the two technical
+tables, snapshot/group association, derived revision and group confirmation
+pointer, with no next revision prepared until the previous reception is confirmed.
+Do not reopen these choices as unresolved proposals.
+
+Scope and acceptance:
+
+1. Evolve Docs' persistent source and DD-023 locally, preserving its existing
+   pending-register overlay and unrelated questions. Regenerate artifacts through
+   its owning Makefile; do not edit generated output. The two approved tables
+   extend the approved persistent/ER count from 25 to 27, following the DD-021
+   precedent, without changing architecture view budgets/memberships.
+2. Add V2 without changing V1. Reject an existing V1 dataset whose missing scope
+   and source receipt cannot be established, before any destructive change; prove
+   atomic refusal on an isolated legacy fixture. No live migration is authorized.
+3. Update the internal mapping and implement transactional owned-store preparation,
+   matching/conflicting receipts, original-member replay and monotonic confirmation.
+   No SQL transaction spans external I/O. No public input boundary, reference
+   client, Recommendation adapter, new NLP hash or generic payload store is added.
+4. Verify fresh/reapplied schema, exact ownership and own-context constraints,
+   immutable snapshots/receipts, crossed associations, cumulative chain, rollback,
+   concurrent creation/preparation and pending-delivery gating on PostgreSQL.
+   Confirmations in these tests are synthetic technical operations, not HTTP
+   downstream receipts. Source comparison tests using synthetic fingerprints do
+   not certify a future real request comparator.
+5. Independent review, fixes and README checks. Record actual results and source
+   provenance; no publication, merge, cloud resource or deployment action.
+
+The next material decision is the exact safe diagnostic representation to freeze
+for Recommendation: whether the current seven snapshot fields with a concretely
+defined summary suffice, or which additional protected per-evidence signals are
+needed. That answer is required before the business write/handoff path; it does
+not block the approved isolated schema/store work. Numeric runtime horizons,
+permissions and retention activation are not selected by local fixture tests.
+
+Implementation completed locally and verified on 2026-11-16:
+
+- Docs source is model 1.4.0/DD-023 on top of integrated `6579219`, preserving
+  its prior local pending-register changes. `make all` completed and regenerated
+  the model-derived DBML, SQL, ER and dictionary through the owning tools; no
+  generated file was hand-edited. Existing C4 warnings about unspecified source
+  descriptions/technologies remained warnings; no architecture fact was invented.
+- `make test`: 116 checks passed. `make test-postgres`: 19 checks passed against
+  disposable PostgreSQL 16.15/pgvector 0.8.7, the Docs tool's existing image.
+- Correlation `./mvnw verify`: 28 checks passed with zero failures, errors or
+  skips on Java 25.0.5.0.3 and disposable PostgreSQL 17.11. The coordinator
+  inspected final Surefire reports: six domain, seven migration/JPA and fifteen
+  durable-store tests. After the final index change the complete source/store
+  checks were rerun successfully. One direct Maven attempt was blocked by the
+  sandbox's `~/.m2` lock access; the authorized rerun passed.
+- The independent reviewer found a missing receipt lookup index. It was added
+  to the source extras and V2, with a generator check. The source guard block and
+  V2 match exactly; V1 has no diff. A deterministic concurrency test coordinates
+  real JDBC reads, observes receipt-key `23505` and verifies rollback of all
+  losing effects. No production test hook or fabricated database result is used.
+- Snapshot restoration is linear before adding a member, and JDBC arrays are
+  released. Receipts preserve the original member revision even when several
+  messages refer to it. Confirmation never regresses or changes timestamps for
+  an old/duplicate acknowledgement. No material review findings remain in the
+  code/constraints; documentation was updated to distinguish these results from
+  the earlier twelve-test domain increment.
+
+All data are synthetic. The fingerprint format is stored/compared but the actual
+request projection/codec is not implemented; tests supply comparison values.
+Confirmations are local technical acknowledgements, not actual Recommendation
+receipts. No business listener, owner clients, runtime credentials, automatic
+migrations, purge, image publication or deployment was introduced. Work now
+reaches the [diagnostic representation decision](deployment-contract.md#next-decision-the-frozen-diagnostic-representation).
+Final documentation coherence checks passed: 41 service-local links/anchors,
+the two added source-doc local references, whitespace checks in both repositories
+and an unchanged V1 migration. Existing unrelated changes were preserved; all
+work remained local and uncommitted before the publication preparation below.
+
+### PR preparation — 2026-11-16
+
+Remote Docs main advanced to `14a71dc44855d60236bdfdeb2d953a2e3edc8de6`, which
+already assigns DD-022 to RAG corpus lifecycle. The unpublished Correlation
+decision was renumbered to DD-023 and rebased onto that accepted main without
+changing its approved behavior. RAG entities and open questions were checked
+against the new main and preserved exactly. The generated model and PostgreSQL
+fixture were reconciled with RAG's required content hash; no RAG runtime or
+contract change is introduced by this increment.
+
+The companion [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13)
+publishes that evolution from source head `849414d6b67b27ecb18cb06e2a2bc5fd2e20bad7`.
+It must be reviewed before treating DD-023 as an integrated main baseline.
+`make all`, the 116 model tests and 19 isolated PostgreSQL checks passed again
+after reconciliation; the service's 28 checks also passed with the renamed
+source reference. Focused independent review found no material reconciliation
+findings. Publication of these PRs does not authorize merge, deployment or the
+next diagnostic-payload increment.
+
+Independent scope of the earlier continuation: worker added checks of evidence-array ownership and attempts
+to merge a changed representation into the existing immutable JPA snapshot.
+Acceptance is preservation of every original field after commit and a fresh
+EntityManager read. This checks the infrastructure mapping, not SQL-level
+immutability, business idempotency or reference authorization. No production
+behavior, schema, dependency or caller changes are planned. The coordinator
+updates the existing documentation and the independent `correlation_reviewer`
+checks the connected mapping, tests and source assumptions before handoff.
+
+Verification at continuation start: `./mvnw verify` passed all five existing
+PostgreSQL tests without failures, errors or skips. After the two added checks,
+worker ran the same command: BUILD SUCCESS, seven tests, zero failures, errors
+or skips against disposable PostgreSQL 17.11. The coordinator inspected the final
+Surefire report. Maven emitted HTTP 401 warnings for metadata from secondary
+repositories; they did not prevent the build. The 27 local documentation
+links/anchors and `git diff --check` passed. The live `correlation_reviewer`
+independently inspected the diff, connected mapping/migration/configuration,
+callers and owning sources, checked the seven-test Surefire result and ran
+`git diff --check`; it reported no material findings. It did not repeat Maven or
+test live services. These checks do not establish SQL-level immutability,
+authorization, business idempotency or downstream reception.
+No publication, merge or deployment is authorized.
+
 Consulted on 2026-11-06: `pipesor-org/pipesor-docs` full Git SHA **`c84ef3e4629fcb0c38315f32b641a5fb949e450d`**, using the clean local checkout (no uncommitted source overlay). Canonical model: `ey_aiops_ci_cd_diagnosis`, version `0.5.0-mvp-iac-alignment`, status `draft`. `evidence_correlation_engine` is a confirmed container with an independent repository under ADR-018; confirmed is a model status only.
 
 Architecture source links below follow `main`. The summary reflects the consulted revision recorded above; review it against subsequent accepted decisions before implementation.

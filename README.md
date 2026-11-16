@@ -3,9 +3,10 @@
 Evidence Correlation Engine correlates protected evidence within workflow execution context, preserves provenance and delivers correlated incident context to the recommendation service. Its canonical architecture ID is `evidence_correlation_engine`; the planned runtime is Java / Spring Boot on Azure Container Apps.
 
 The local foundation contains a Java/Spring Boot Maven build, a non-web bootstrap,
-the modeled `evidence.correlated_contexts` Flyway migration and its infrastructure
-JPA mapping. It does not yet receive NLP requests, correlate incoming evidence or
-deliver to Recommendation. Those parts require the
+the owned Flyway migrations and snapshot JPA mapping, a pure domain grouping rule
+and an internal transactional store for cumulative snapshots, source receipts
+and group confirmation. It does not yet receive NLP requests or deliver to
+Recommendation. The business boundary and handoff require the
 [contract decisions](docs/deployment-contract.md#local-contract-proposal-for-decision).
 No container image or release automation is introduced.
 
@@ -25,30 +26,54 @@ Maven Wrapper (Maven 3.10.0, Wrapper 3.3.4); Spring Boot 4.1.2 manages the depen
 set. Docker must be reachable for the PostgreSQL checks. The first run downloads
 Maven/dependencies and the `postgres:17.11` test image.
 
-Verified on 2026-11-11 with Java 25.0.4.1 and Docker 29.9.3:
+Verified on 2026-11-16 with Java 25.0.5.0.3 and Docker 29.9.3:
 
 ```bash
 ./mvnw verify
 ```
 
-Five tests passed, without skips, against disposable PostgreSQL 17.11 via
-Testcontainers. They check Flyway application/reapplication/validation, the exact
-owned table and absence of foreign keys/foreign tables, Hibernate validation,
-UUID-array/reference and UTC microsecond timestamp round-trips, coexistence of
-distinct executions with identical summary/correlation, rollback, primary-key
-conflict (`23505`) without overwrite and required-column rejection (`23502`).
-The test starts the actual non-web Spring context with its isolated datasource.
-It invokes Flyway explicitly with a test-only history in `evidence`; production
-migration runner/history coordination remains PD-035. The containers are removed
-after the checks. No live service or environment database is used.
+Twenty-eight tests passed without failures, errors or skips: six pure domain,
+seven migration/JPA and fifteen durable-store checks. PostgreSQL 17.11 is
+disposable via Testcontainers. They verify:
+
+- Fresh V1/V2 application, reapplication and validation, exact owned tables and
+  three FKs solely between Correlation tables; Hibernate validates the snapshot.
+- UUID/reference and UTC microsecond timestamp round-trips, defensive arrays,
+  unchanged stored snapshots after detached merge, rollback and native
+  required-column rejection (`23502`).
+- Immutable cumulative memberships and restoration; separation by opaque scope,
+  execution and incident; matching replay recovers the first frozen result and
+  conflicting input changes nothing.
+- Concurrent group/message creation, duplicate-member messages mapping to their
+  original revision, pending-reception gating and monotonic confirmation.
+  One test coordinates real JDBC queries to force a receipt-key collision
+  (`23505`) and verifies complete rollback of the losing context.
+- SQL rejection of invalid sets, broken chains, crossed memberships and ordinary
+  history mutation. V2 refuses a populated V1 database and preserves its rows and
+  original schema; it never fabricates scope or historical receipts.
+
+The JPA test starts the actual non-web Spring context with an isolated datasource.
+Tests invoke Flyway explicitly with test-only history; production migration
+runner/history coordination remains PD-035. Containers are removed after checks.
+No environment database or live service is used.
 
 The bootstrap has no HTTP listener, datasource credentials or connection defaults;
 Flyway is disabled by default and Hibernate uses `ddl-auto=validate`. There is no
 business startup command yet. The mapping is package-private infrastructure, not
-an authorized input/write API or sanitizer. Tests use synthetic metadata only.
-They do not validate tenant authorization, logical-reference existence, business
-timestamp nanosecond preservation, message idempotency, real NLP fixture delivery
-or Recommendation handoff. These remain dependent on the contracts above.
+an authorized input/write API or sanitizer. The store is package-private and is
+not registered as a business bean or listener. Callers must authenticate scope
+and producer, validate owner references/ORIGIN membership and sanitize summaries.
+Tests use synthetic metadata and supplied comparison fingerprints; no real
+request comparator or canonicalization is implemented. Local technical
+confirmation is not evidence of Recommendation reception. Tenant authorization,
+foreign-reference existence, business timestamp nanosecond preservation, real
+NLP delivery and Recommendation handoff remain outside these checks.
+
+The durable schema follows locally adopted DD-023 in
+[pipesor-docs](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-023),
+reviewed separately in [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13)
+and not yet integrated into main. V1 remains unchanged.
+There is no purge, retention horizon, background retry or activation default.
 
 For documentation, check affected links and consistency with referenced sources,
 then run:
@@ -111,11 +136,14 @@ the actual `service_analyst` in a fresh session, then independently review its b
 Do not label an explorer acting from copied instructions as that custom role.
 See also the official [instruction-discovery guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
-Setup verification on 2026-11-11 (codex-cli 0.167.1): TOML syntax, required role
+Initial setup verification on 2026-11-11 (codex-cli 0.167.1): TOML syntax, required role
 fields, configured model/effort and two-thread limit passed. The prompt-input
 diagnostic discovered both exact custom-role descriptions alongside worker and
 explorer without a model invocation. It required execution outside the read-only
 sandbox to initialize local CLI state; no global trust, provider or permission
-configuration was changed. Live invocation of the new analyst is still unverified;
-the earlier correlation reviewer execution is not an analyst pilot. No application
-code changed in this agent-setup increment, so the backend suite was not repeated.
+configuration was changed. A subsequent local continuation invoked the actual
+`service_analyst` successfully: it reconciled integrated sources, identified the
+PD-031 reference-validation decision and separated ready snapshot checks from
+blocked business integration. This verifies a live analyst handoff in this session;
+it does not certify every agent configuration or approve a contract. No application
+code changed in the initial agent-setup increment, so its backend suite was not repeated.
