@@ -5,7 +5,9 @@ Evidence Correlation Engine correlates protected evidence within workflow execut
 The local foundation contains a Java/Spring Boot Maven build, a non-web bootstrap,
 the owned Flyway migrations and snapshot JPA mapping, a pure domain grouping rule
 and an internal transactional store for cumulative snapshots, source receipts
-and group confirmation. It does not yet receive NLP requests or deliver to
+and group confirmation. Each revision freezes the newly introduced evidence
+signal once; an internal read reconstructs the exact signals of an older revision.
+It does not yet receive NLP requests or deliver to
 Recommendation. The business boundary and handoff require the
 [contract decisions](docs/deployment-contract.md#local-contract-proposal-for-decision).
 No container image or release automation is introduced.
@@ -32,11 +34,11 @@ Verified on 2026-11-16 with Java 25.0.5.0.3 and Docker 29.9.3:
 ./mvnw verify
 ```
 
-Twenty-eight tests passed without failures, errors or skips: six pure domain,
-seven migration/JPA and fifteen durable-store checks. PostgreSQL 17.11 is
+Thirty-eight tests passed without failures, errors or skips: eight domain,
+eight migration/JPA, fifteen durable-store and seven frozen-signal checks. PostgreSQL 17.11 is
 disposable via Testcontainers. They verify:
 
-- Fresh V1/V2 application, reapplication and validation, exact owned tables and
+- Fresh V1/V2/V3 application, reapplication and validation, exact owned tables and
   three FKs solely between Correlation tables; Hibernate validates the snapshot.
 - UUID/reference and UTC microsecond timestamp round-trips, defensive arrays,
   unchanged stored snapshots after detached merge, rollback and native
@@ -51,6 +53,11 @@ disposable via Testcontainers. They verify:
 - SQL rejection of invalid sets, broken chains, crossed memberships and ordinary
   history mutation. V2 refuses a populated V1 database and preserves its rows and
   original schema; it never fabricates scope or historical receipts.
+- Frozen Unicode signals, changed-signal conflicts across messages/producers,
+  concurrent aliases, deferred receipt failure and complete rollback.
+  Historical reads recover exactly their own members, original incorporation
+  traces and protected signals; crossed or damaged fixtures fail without partial
+  output. V3 refuses populated V2, preserving data, schema, guards and history.
 
 The JPA test starts the actual non-web Spring context with an isolated datasource.
 Tests invoke Flyway explicitly with test-only history; production migration
@@ -69,10 +76,13 @@ confirmation is not evidence of Recommendation reception. Tenant authorization,
 foreign-reference existence, business timestamp nanosecond preservation, real
 NLP delivery and Recommendation handoff remain outside these checks.
 
-The durable schema follows locally adopted DD-023 in
+The durable group/receipt schema follows integrated DD-023 in
 [pipesor-docs](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-023),
-reviewed separately in [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13)
-and not yet integrated into main. V1 remains unchanged.
+merged through [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13).
+The locally approved signal extension evolves that source to model 1.5.0; V3
+adds stage, protected summary and minimized protected content to each introducing
+revision. V1/V2 remain unchanged. A populated V2 database is refused atomically
+because the original protected signal cannot be recovered from fingerprints.
 There is no purge, retention horizon, background retry or activation default.
 
 For documentation, check affected links and consistency with referenced sources,

@@ -1,5 +1,6 @@
 package org.pipesor.correlation.context.infrastructure.persistence.jpa;
 
+import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,6 +56,7 @@ class DurableCorrelationStoreTest {
         var replay = store.prepare(withSummary(input, "Changed derived synthetic summary"));
         assertThat(replay.snapshot().id()).isEqualTo(first.snapshot().id());
         assertThat(replay.snapshot().summary()).isEqualTo(input.snapshotSummary());
+        assertThat(replay.snapshot().signal()).isEqualTo(input.signal());
         assertThat(replay.snapshot().evidenceIds()).containsExactly(input.evidenceId());
         assertThat(replay.snapshot().correlationId()).isEqualTo(input.correlationId());
         assertThat(replay.snapshot().createdAt()).isEqualTo(Instant.parse("2026-11-11T00:00:00.123456Z"));
@@ -72,16 +74,16 @@ class DurableCorrelationStoreTest {
         var conflicting = List.of(
                 new DurableCorrelationStore.Contribution(new Context(input.context().scope(), UUID.randomUUID(),
                         input.context().incidentId()), input.producerKey(), input.messageId(), input.evidenceId(),
-                        input.correlationId(), input.inputFingerprint(), input.snapshotSummary()),
+                        input.correlationId(), input.inputFingerprint(), input.snapshotSummary(), input.signal()),
                 new DurableCorrelationStore.Contribution(new Context(input.context().scope(), input.context().executionId(),
                         UUID.randomUUID()), input.producerKey(), input.messageId(), input.evidenceId(),
-                        input.correlationId(), input.inputFingerprint(), input.snapshotSummary()),
+                        input.correlationId(), input.inputFingerprint(), input.snapshotSummary(), input.signal()),
                 new DurableCorrelationStore.Contribution(input.context(), input.producerKey(), input.messageId(), UUID.randomUUID(),
-                        input.correlationId(), input.inputFingerprint(), input.snapshotSummary()),
+                        input.correlationId(), input.inputFingerprint(), input.snapshotSummary(), input.signal()),
                 new DurableCorrelationStore.Contribution(input.context(), input.producerKey(), input.messageId(), input.evidenceId(),
-                        "other-safe-correlation", input.inputFingerprint(), input.snapshotSummary()),
+                        "other-safe-correlation", input.inputFingerprint(), input.snapshotSummary(), input.signal()),
                 new DurableCorrelationStore.Contribution(input.context(), input.producerKey(), input.messageId(), input.evidenceId(),
-                        input.correlationId(), "v1:sha256:" + "b".repeat(64), input.snapshotSummary()));
+                        input.correlationId(), "v1:sha256:" + "b".repeat(64), input.snapshotSummary(), input.signal()));
         for (var changed : conflicting) {
             assertThrows(IllegalArgumentException.class, () -> store.prepare(changed));
             assertThat(counts()).isEqualTo(before);
@@ -97,7 +99,7 @@ class DurableCorrelationStoreTest {
         var secondInput = input(input.context());
         var second = store.prepare(secondInput);
         var alias = new DurableCorrelationStore.Contribution(input.context(), "other-authenticated-producer", UUID.randomUUID(),
-                input.evidenceId(), "alias-safe-correlation", "v1:sha256:" + "c".repeat(64), "Changed derived summary");
+                input.evidenceId(), "alias-safe-correlation", "v1:sha256:" + "c".repeat(64), "Changed derived summary", input.signal());
         var recovered = store.prepare(alias);
         assertThat(recovered.snapshot().id()).isEqualTo(first.snapshot().id());
         assertThat(recovered.snapshot().summary()).isEqualTo(first.snapshot().summary());
@@ -128,12 +130,12 @@ class DurableCorrelationStoreTest {
         var otherScope = new DurableCorrelationStore.Contribution(
                 new Context("other-scope-" + UUID.randomUUID(), input.context().executionId(), input.context().incidentId()),
                 input.producerKey(), input.messageId(), input.evidenceId(), input.correlationId(), input.inputFingerprint(),
-                input.snapshotSummary());
+                input.snapshotSummary(), input.signal());
         var other = store.prepare(otherScope);
         assertThat(other.snapshot().groupId()).isNotEqualTo(first.snapshot().groupId());
         var execution = new Context(input.context().scope(), UUID.randomUUID(), input.context().incidentId());
         var third = store.prepare(new DurableCorrelationStore.Contribution(execution, input.producerKey(), UUID.randomUUID(),
-                input.evidenceId(), input.correlationId(), input.inputFingerprint(), input.snapshotSummary()));
+                input.evidenceId(), input.correlationId(), input.inputFingerprint(), input.snapshotSummary(), input.signal()));
         assertThat(third.snapshot().groupId()).isNotIn(first.snapshot().groupId(), other.snapshot().groupId());
     }
 
@@ -185,7 +187,7 @@ class DurableCorrelationStoreTest {
     void concurrentDifferentMessagesForSameMemberShareOneOriginalSnapshot() throws Exception {
         var firstInput = input(context());
         var alias = new DurableCorrelationStore.Contribution(firstInput.context(), firstInput.producerKey(), UUID.randomUUID(),
-                firstInput.evidenceId(), "another-safe-correlation", firstInput.inputFingerprint(), "Changed summary");
+                firstInput.evidenceId(), "another-safe-correlation", firstInput.inputFingerprint(), "Changed summary", firstInput.signal());
         var results = race(() -> store.prepare(firstInput), () -> store.prepare(alias));
         assertThat(results.get(0).snapshot().id()).isEqualTo(results.get(1).snapshot().id());
         assertThat(snapshotCount(results.get(0).snapshot().groupId())).isEqualTo(1);
@@ -197,7 +199,7 @@ class DurableCorrelationStoreTest {
         var firstInput = input(context());
         var other = new DurableCorrelationStore.Contribution(new Context(firstInput.context().scope(), UUID.randomUUID(),
                 firstInput.context().incidentId()), firstInput.producerKey(), firstInput.messageId(), firstInput.evidenceId(),
-                firstInput.correlationId(), firstInput.inputFingerprint(), firstInput.snapshotSummary());
+                firstInput.correlationId(), firstInput.inputFingerprint(), firstInput.snapshotSummary(), firstInput.signal());
         var before = counts();
         var coordinated = new ReceiptRaceDataSource();
         var racingStore = new DurableCorrelationStore(coordinated, Clock.fixed(NOW, ZoneOffset.UTC));
@@ -240,7 +242,7 @@ class DurableCorrelationStoreTest {
     void receiptInsertFailureRollsBackGroupAndSnapshotTogether() throws SQLException {
         var input = input(context());
         var rejected = new DurableCorrelationStore.Contribution(input.context(), "synthetic-rejected-producer", input.messageId(),
-                input.evidenceId(), input.correlationId(), input.inputFingerprint(), input.snapshotSummary());
+                input.evidenceId(), input.correlationId(), input.inputFingerprint(), input.snapshotSummary(), input.signal());
         var before = counts();
         try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
             statement.executeUpdate("ALTER TABLE evidence.correlation_receipts ADD CONSTRAINT synthetic_failure CHECK (producer_key <> 'synthetic-rejected-producer')");
@@ -294,7 +296,7 @@ class DurableCorrelationStoreTest {
         var b = UUID.randomUUID();
         assertRejected("INSERT INTO evidence.correlated_contexts VALUES ('" + UUID.randomUUID() + "', '"
                 + input.context().incidentId() + "','" + input.context().executionId() + "', ARRAY['"
-                + input.evidenceId() + "','" + b + "']::uuid[], 'Safe summary', 'safe-correlation', now(), '" + group.id() + "')", "23514");
+                + input.evidenceId() + "','" + b + "']::uuid[], 'Safe summary', 'safe-correlation', now(), '" + group.id() + "','BUILD','Safe summary','Safe content')", "23514");
         store.confirm(first.snapshot().groupId(), first.snapshot().id());
         var second = store.prepare(input(input.context()));
         var receipt = "INSERT INTO evidence.correlation_receipts VALUES ('" + input.context().scope()
@@ -305,7 +307,7 @@ class DurableCorrelationStoreTest {
         assertRejected(receipt.replace(input.evidenceId().toString(), UUID.randomUUID().toString()), "23514");
         assertRejected("INSERT INTO evidence.correlated_contexts VALUES ('" + UUID.randomUUID() + "', '"
                 + UUID.randomUUID() + "','" + input.context().executionId() + "', ARRAY['" + b
-                + "']::uuid[], 'Safe summary', 'safe-correlation', now(), '" + group.id() + "')", "23514");
+                + "']::uuid[], 'Safe summary', 'safe-correlation', now(), '" + group.id() + "','BUILD','Safe summary','Safe content')", "23514");
         assertThat(snapshotCount(group.id())).isEqualTo(2);
     }
 
@@ -454,12 +456,12 @@ class DurableCorrelationStoreTest {
 
     private static DurableCorrelationStore.Contribution input(Context context) {
         return new DurableCorrelationStore.Contribution(context, "synthetic-authenticated-producer", UUID.randomUUID(),
-                UUID.randomUUID(), "synthetic-safe-correlation", "v1:sha256:" + "a".repeat(64), "Protected evidence references");
+                UUID.randomUUID(), "synthetic-safe-correlation", "v1:sha256:" + "a".repeat(64), "Protected evidence references", new EvidenceSignal("BUILD", "Protected build summary", "Protected build content"));
     }
 
     private static DurableCorrelationStore.Contribution withSummary(DurableCorrelationStore.Contribution input, String summary) {
         return new DurableCorrelationStore.Contribution(input.context(), input.producerKey(), input.messageId(), input.evidenceId(),
-                input.correlationId(), input.inputFingerprint(), summary);
+                input.correlationId(), input.inputFingerprint(), summary, input.signal());
     }
 
     private static List<Long> counts() throws SQLException {
@@ -513,7 +515,7 @@ class DurableCorrelationStoreTest {
         try (var statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO evidence.correlated_contexts VALUES ('" + id + "','" + group.context().incidentId()
                     + "','" + group.context().executionId() + "'," + array
-                    + ",'Safe protected summary','safe-correlation',now(),'" + group.id() + "')");
+                    + ",'Safe protected summary','safe-correlation',now(),'" + group.id() + "','BUILD','Safe summary','Safe content')");
         }
     }
 
