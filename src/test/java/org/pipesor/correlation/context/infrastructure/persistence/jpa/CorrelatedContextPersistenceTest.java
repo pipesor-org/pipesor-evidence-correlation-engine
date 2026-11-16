@@ -38,7 +38,7 @@ class CorrelatedContextPersistenceTest {
                 .defaultSchema("evidence")
                 .table("flyway_history_local_correlation")
                 .load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
         context = new SpringApplicationBuilder(CorrelationApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
@@ -70,7 +70,7 @@ class CorrelatedContextPersistenceTest {
                 while (rows.next()) columns.add(rows.getString(1));
                 assertThat(columns).containsExactly("id:uuid:NO", "incident_id:uuid:NO",
                         "execution_id:uuid:NO", "evidence_ids:_uuid:NO", "summary:text:NO",
-                        "correlation_id:text:NO", "created_at:timestamptz:NO");
+                        "correlation_id:text:NO", "created_at:timestamptz:NO", "group_id:uuid:NO");
             }
             try (var rows = statement.executeQuery("""
                     SELECT table_schema || '.' || table_name FROM information_schema.tables
@@ -80,15 +80,15 @@ class CorrelatedContextPersistenceTest {
                 var tables = new ArrayList<String>();
                 while (rows.next()) tables.add(rows.getString(1));
                 assertThat(tables).containsExactly("evidence.correlated_contexts",
+                        "evidence.correlation_groups", "evidence.correlation_receipts",
                         "evidence.flyway_history_local_correlation");
             }
             try (var rows = statement.executeQuery("""
                     SELECT count(*) FROM information_schema.table_constraints
-                    WHERE table_schema = 'evidence' AND table_name = 'correlated_contexts'
-                      AND constraint_type = 'FOREIGN KEY'
+                    WHERE table_schema = 'evidence' AND constraint_type = 'FOREIGN KEY'
                     """)) {
                 rows.next();
-                assertThat(rows.getInt(1)).isZero();
+                assertThat(rows.getInt(1)).isEqualTo(3);
             }
         }
     }
@@ -109,8 +109,56 @@ class CorrelatedContextPersistenceTest {
             assertThat(stored.summary()).isEqualTo(first.summary());
             assertThat(stored.correlationId()).isEqualTo(first.correlationId());
             assertThat(stored.createdAt()).isEqualTo(first.createdAt());
+            assertThat(stored.groupId()).isEqualTo(first.groupId());
             assertThat(entityManager.find(CorrelatedContextEntity.class, otherExecution.id()).executionId())
                     .isEqualTo(otherExecution.executionId());
+        }
+    }
+
+    @Test
+    void evidenceArrayAliasesCannotChangeSnapshot() {
+        var evidenceIds = new UUID[]{UUID.randomUUID()};
+        var expectedEvidenceIds = evidenceIds.clone();
+        var original = new CorrelatedContextEntity(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                evidenceIds, "Protected evidence references", "synthetic-correlation:aliases",
+                Instant.parse("2026-11-11T00:00:00.123456Z"), UUID.randomUUID());
+
+        evidenceIds[0] = UUID.randomUUID();
+        assertThat(original.evidenceIds()).containsExactly(expectedEvidenceIds);
+        original.evidenceIds()[0] = UUID.randomUUID();
+        assertThat(original.evidenceIds()).containsExactly(expectedEvidenceIds);
+        persist(original);
+
+        try (var entityManager = entityManagers.createEntityManager()) {
+            assertThat(entityManager.find(CorrelatedContextEntity.class, original.id()).evidenceIds())
+                    .containsExactly(expectedEvidenceIds);
+        }
+    }
+
+    @Test
+    void mergingDetachedChangesPreservesEveryStoredSnapshotField() {
+        var original = snapshot(UUID.randomUUID(), UUID.randomUUID());
+        persist(original);
+        var changed = new CorrelatedContextEntity(original.id(), UUID.randomUUID(), UUID.randomUUID(),
+                new UUID[]{UUID.randomUUID()}, "Different protected evidence references",
+                "synthetic-correlation:changed", original.createdAt().plusSeconds(1), UUID.randomUUID());
+
+        try (var entityManager = entityManagers.createEntityManager()) {
+            entityManager.getTransaction().begin();
+            entityManager.merge(changed);
+            entityManager.getTransaction().commit();
+        }
+
+        try (var entityManager = entityManagers.createEntityManager()) {
+            var stored = entityManager.find(CorrelatedContextEntity.class, original.id());
+            assertThat(stored.id()).isEqualTo(original.id());
+            assertThat(stored.incidentId()).isEqualTo(original.incidentId());
+            assertThat(stored.executionId()).isEqualTo(original.executionId());
+            assertThat(stored.evidenceIds()).containsExactly(original.evidenceIds());
+            assertThat(stored.summary()).isEqualTo(original.summary());
+            assertThat(stored.correlationId()).isEqualTo(original.correlationId());
+            assertThat(stored.createdAt()).isEqualTo(original.createdAt());
+            assertThat(stored.groupId()).isEqualTo(original.groupId());
         }
     }
 
@@ -119,6 +167,7 @@ class CorrelatedContextPersistenceTest {
         var snapshot = snapshot(UUID.randomUUID(), UUID.randomUUID());
         try (var entityManager = entityManagers.createEntityManager()) {
             entityManager.getTransaction().begin();
+            insertGroup(entityManager, snapshot);
             entityManager.persist(snapshot);
             entityManager.flush();
             entityManager.getTransaction().rollback();
@@ -135,6 +184,7 @@ class CorrelatedContextPersistenceTest {
         var collision = snapshot(original.id(), UUID.randomUUID());
         try (var entityManager = entityManagers.createEntityManager()) {
             entityManager.getTransaction().begin();
+            insertGroup(entityManager, collision);
             entityManager.persist(collision);
             var failure = assertThrows(PersistenceException.class, entityManager::flush);
             assertThat(sqlCause(failure).getSQLState()).isEqualTo("23505");
@@ -148,33 +198,58 @@ class CorrelatedContextPersistenceTest {
 
     @Test
     void databaseRejectsNullInEveryRequiredColumn() throws SQLException {
-        var values = List.of("'" + UUID.randomUUID() + "'", "'" + UUID.randomUUID() + "'",
-                "'" + UUID.randomUUID() + "'", "ARRAY[]::uuid[]", "'Protected evidence references'",
-                "'synthetic-correlation'", "TIMESTAMPTZ '2026-11-11 00:00:00+00'");
-        try (var connection = connection(); var statement = connection.createStatement()) {
-            for (int index = 0; index < values.size(); index++) {
-                var invalid = new ArrayList<>(values);
-                invalid.set(index, "NULL");
+        for (int index = 0; index < 8; index++) {
+            var eligible = snapshot(UUID.randomUUID(), UUID.randomUUID());
+            try (var connection = connection(); var statement = connection.createStatement()) {
+                connection.setAutoCommit(false);
+                statement.executeUpdate("INSERT INTO evidence.correlation_groups VALUES ('" + eligible.groupId()
+                        + "', 'synthetic-scope', '" + eligible.executionId() + "', '" + eligible.incidentId()
+                        + "', NULL, now(), now())");
+                var values = new ArrayList<>(List.of("'" + eligible.id() + "'", "'" + eligible.incidentId() + "'",
+                        "'" + eligible.executionId() + "'", "ARRAY['" + eligible.evidenceIds()[0] + "']::uuid[]",
+                        "'Protected evidence references'", "'synthetic-correlation'",
+                        "TIMESTAMPTZ '2026-11-11 00:00:00+00'", "'" + eligible.groupId() + "'"));
+                values.set(index, "NULL");
                 var failure = assertThrows(SQLException.class, () -> statement.executeUpdate(
-                        "INSERT INTO evidence.correlated_contexts VALUES (" + String.join(",", invalid) + ")"));
+                        "INSERT INTO evidence.correlated_contexts VALUES (" + String.join(",", values) + ")"));
                 assertThat(failure.getSQLState()).isEqualTo("23502");
+                connection.rollback();
             }
         }
     }
 
     private static CorrelatedContextEntity snapshot(UUID id, UUID executionId) {
         return new CorrelatedContextEntity(id, UUID.randomUUID(), executionId,
-                new UUID[]{UUID.randomUUID(), UUID.randomUUID()},
+                new UUID[]{UUID.randomUUID()},
                 "Protected evidence references", "synthetic-correlation:α/01",
-                Instant.parse("2026-11-11T00:00:00.123456Z"));
+                Instant.parse("2026-11-11T00:00:00.123456Z"), UUID.randomUUID());
     }
 
     private static void persist(CorrelatedContextEntity snapshot) {
         try (EntityManager entityManager = entityManagers.createEntityManager()) {
             entityManager.getTransaction().begin();
+            insertGroup(entityManager, snapshot);
             entityManager.persist(snapshot);
+            entityManager.flush();
+            entityManager.createNativeQuery("""
+                    INSERT INTO evidence.correlation_receipts VALUES
+                    (:scope, 'synthetic-producer', :message, :evidence, :correlation, :context, :fingerprint, :created)
+                    """).setParameter("scope", "synthetic-scope")
+                    .setParameter("message", UUID.randomUUID()).setParameter("evidence", snapshot.evidenceIds()[0])
+                    .setParameter("correlation", snapshot.correlationId()).setParameter("context", snapshot.id())
+                    .setParameter("fingerprint", "v1:sha256:" + "a".repeat(64))
+                    .setParameter("created", snapshot.createdAt()).executeUpdate();
             entityManager.getTransaction().commit();
         }
+    }
+
+    private static void insertGroup(EntityManager entityManager, CorrelatedContextEntity snapshot) {
+        entityManager.createNativeQuery("""
+                INSERT INTO evidence.correlation_groups VALUES
+                (:id, 'synthetic-scope', :execution, :incident, NULL, :created, :created)
+                """).setParameter("id", snapshot.groupId()).setParameter("execution", snapshot.executionId())
+                .setParameter("incident", snapshot.incidentId()).setParameter("created", snapshot.createdAt())
+                .executeUpdate();
     }
 
     private static Connection connection() throws SQLException {

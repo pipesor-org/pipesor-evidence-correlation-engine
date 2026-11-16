@@ -27,12 +27,14 @@ class CorrelatedContextEntity {
     private String correlationId;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+    @Column(name = "group_id", nullable = false)
+    private UUID groupId;
 
     protected CorrelatedContextEntity() {
     }
 
     CorrelatedContextEntity(UUID id, UUID incidentId, UUID executionId, UUID[] evidenceIds,
-                            String summary, String correlationId, Instant createdAt) {
+                            String summary, String correlationId, Instant createdAt, UUID groupId) {
         this.id = id;
         this.incidentId = incidentId;
         this.executionId = executionId;
@@ -40,6 +42,7 @@ class CorrelatedContextEntity {
         this.summary = summary;
         this.correlationId = correlationId;
         this.createdAt = createdAt;
+        this.groupId = groupId;
     }
 
     UUID id() { return id; }
@@ -49,4 +52,5 @@ class CorrelatedContextEntity {
     String summary() { return summary; }
     String correlationId() { return correlationId; }
     Instant createdAt() { return createdAt; }
+    UUID groupId() { return groupId; }
 }
