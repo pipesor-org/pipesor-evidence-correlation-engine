@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Immutable;
+import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -29,12 +30,18 @@ class CorrelatedContextEntity {
     private Instant createdAt;
     @Column(name = "group_id", nullable = false)
     private UUID groupId;
+    @Column(name = "signal_stage", nullable = false, columnDefinition = "text")
+    private String signalStage;
+    @Column(name = "signal_summary", nullable = false, columnDefinition = "text")
+    private String signalSummary;
+    @Column(name = "signal_content", nullable = false, columnDefinition = "text")
+    private String signalContent;
 
     protected CorrelatedContextEntity() {
     }
 
     CorrelatedContextEntity(UUID id, UUID incidentId, UUID executionId, UUID[] evidenceIds,
-                            String summary, String correlationId, Instant createdAt, UUID groupId) {
+                            String summary, String correlationId, Instant createdAt, UUID groupId, EvidenceSignal signal) {
         this.id = id;
         this.incidentId = incidentId;
         this.executionId = executionId;
@@ -43,6 +50,9 @@ class CorrelatedContextEntity {
         this.correlationId = correlationId;
         this.createdAt = createdAt;
         this.groupId = groupId;
+        this.signalStage = signal.stage();
+        this.signalSummary = signal.summary();
+        this.signalContent = signal.content();
     }
 
     UUID id() { return id; }
@@ -53,4 +63,5 @@ class CorrelatedContextEntity {
     String correlationId() { return correlationId; }
     Instant createdAt() { return createdAt; }
     UUID groupId() { return groupId; }
+    EvidenceSignal signal() { return new EvidenceSignal(signalStage, signalSummary, signalContent); }
 }

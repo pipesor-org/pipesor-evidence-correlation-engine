@@ -87,10 +87,11 @@ Documented ownership from ADR-018 and `model/domain.yml.entities`:
 
 `evidence.correlated_contexts` (confirmed)
 
-Locally adopted DD-023 adds `evidence.correlation_groups` and
-`evidence.correlation_receipts`, owned solely by this service. The source model
-and generated constraints are local changes to `pipesor-docs` on top of the
-integrated revision recorded below; they are not a claimed published baseline.
+Integrated DD-023 adds `evidence.correlation_groups` and
+`evidence.correlation_receipts`, owned solely by this service (Docs main
+`174e7993984bed61e7d59b6139da204c1f6025aa`, including model PR #13).
+The approved local signal extension evolves the source to model 1.5.0; its
+three new snapshot fields and generated constraints are not yet integrated.
 
 One physical PostgreSQL instance is shared; queries and commands use logical CQRS. Writes are confined to owned tables; shared schemas do not grant cross-owner writes. Physical FKs may exist within a schema; cross-schema references are logical IDs, with no ORM navigation across contexts (ADR-018, DD-014, PD-031). `audit.audit_events` has shared cross-cutting ownership and is not assigned exclusively to this repository; exact shared audit-write mechanics remain pending PD-035. Inferred `pipeline_access_grants`, where listed, preserve `ia_only`/inferred status and pending PD-007/008. No persistent schema is added for technical processing services without documented ownership.
 
@@ -302,20 +303,18 @@ owner's policy. Receipt replay horizon and eventual metadata disposal still
 require an agreed lifecycle; no unlimited retention or cascading deletion is
 selected by this proposal.
 
-A fingerprint cannot recover discarded enrichment. Before enabling the business
-write/handoff path, Recommendation must identify the safe accepted representation
-it needs. This does not block the approved isolated storage increment. Reuse
-the frozen snapshot if the seven fields suffice; if extra protected signals are
-required, approve their minimum recoverable owner representation explicitly.
-Do not add a generic payload store to anticipate that answer.
+A fingerprint cannot recover discarded enrichment. The locally approved
+representation below freezes a minimal protected signal at first incorporation.
+The versioned Recommendation request and durable receipt remain to be agreed
+before enabling the business handoff. No generic payload store is introduced.
 
 The approved physical increment implements the representation and serial
 policy, with conservative refusal of unmapped legacy rows and no purge/runtime
 activation. A duplicate member under a different message is associated with the
 original member revision; source comparison remains per scoped producer/message
 key. Technical choices do not require reopening that approval. The next material
-decision is the minimum safe diagnostic representation to freeze and deliver;
-runtime identity, owner validation and live receipt integration remain separately
+decision for integration is the versioned request/receipt carrying the approved
+representation; runtime identity, owner validation and live receipt integration remain separately
 bounded work, not claims made by these storage checks.
 
 The acceptance criteria cover concurrent first creation/member additions without
@@ -327,30 +326,40 @@ and migration/retention refusal when provenance or valid references would be
 lost. The implemented storage subset and actual results are recorded in README;
 these local checks do not establish real owner validation or downstream receipt.
 
-#### Next decision: the frozen diagnostic representation
+<a id="next-decision-the-frozen-diagnostic-representation"></a>
 
-The approved source model, migration and local store are implemented. Before
-building the business write/handoff path, choose the information needed by
-Recommendation. [ADR-015](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/architecture/decisions/ADR-015-diagnostic-runtime-boundaries-and-orchestration.md)
-uses sanitized evidence and RAG context for inference. The
-[proposed diagnostic design](https://github.com/pipesor-org/pipesor-docs/blob/main/model/design.yml)
-also mentions sanitized evidence, but does not approve an input DTO or specify
-fields. There is no agreed Recommendation-to-evidence lookup to recover omitted
-signals from IDs alone. A successful storage test cannot establish diagnostic
-sufficiency.
+#### Frozen diagnostic representation — approved locally
 
-| Decision option | Effect |
-|---|---|
-| Seven snapshot fields, with an agreed synthesized `summary` | Reuses the current stored result entirely; diagnosis has only that summary and evidence IDs. Its usefulness/limitations must be accepted explicitly; no hidden lookup or reconstruction from a fingerprint. |
-| Snapshot plus a minimal protected signal per evidence (recommended) | Preserve `evidence_id`, stage, sanitized summary and minimized sanitized content from first acceptance, with their original provenance. This retains diagnostic error detail without transmitting raw logs or relying on an unstable template. Approve the exact recoverable representation before extending storage; avoid a generic payload store or repeating full signal content in every cumulative snapshot. |
+Approved locally on 2026-11-16: freeze one minimal protected signal on the
+snapshot that first introduces its evidence. This extends DD-023 explicitly;
+Log/Event continues to own original evidence. Textual overlap is intentional:
+Correlation owns the first accepted minimized processed projection needed for
+repeatable delivery, without an evidence-fetch integration or full request copy.
 
-The concrete approval question is whether to include those minimal protected
-per-evidence signals or deliberately constrain diagnosis to the existing
-snapshot summary. A template is optional enrichment, not a cause or a prerequisite
-for grouping; no NLP wire hash/cache is needed for either option. No new payload
-fields, storage copies or receiver contracts are implemented in anticipation of
-the answer. Runtime authorization/reference validation remains a separate boundary
-requirement, not something this decision or a technical confirmation bypasses.
+- `signal_stage`, `signal_summary`, `signal_content` are required typed text.
+  Stage reuses BUILD, TESTING, QUALITY_GATE, DEPLOYMENT, CONTAINER and
+  INFRASTRUCTURE. `summary` remains the aggregate operational summary.
+- The introducing evidence ID comes from distinct receipt membership for that
+  context. Its snapshot `correlation_id` records incorporation trace; no new
+  timestamps or claim of SQL-enforced canonical producer ordering is added.
+- Matching replay preserves the original result. A new message for the same
+  evidence returns its original revision only if the three signal values agree;
+  contradictory signal values fail without effects. Templates are excluded.
+- Revision R is reconstructed from same-group introducing snapshots through R
+  in introduction order. Its distinct evidence IDs and count must exactly match
+  R's membership; missing, duplicate or crossed projections fail closed. The
+  internal reader checks expected scope/execution/incident, not user authority.
+- V3 adds the fields and updates the snapshot guard without altering V1/V2.
+  Any existing V2 snapshots make V3 refuse atomically: neither fingerprints nor
+  current upstream text can reconstruct the originally accepted signal.
+
+Callers must supply already protected and minimized text. Shape validation and
+redacted diagnostic strings do not constitute a sanitizer. Input/output size
+budgets, authorization/reference validation and the versioned synchronous
+Recommendation request/receipt must be specified before exposing the business
+path. The approved storage representation does not prove diagnostic quality or
+live downstream receipt. No NLP storage/hash, generic payload, new table or RAG
+client is needed for this increment.
 
 ### NLP → Correlation: existing producer and proposed receiver
 

@@ -1,7 +1,10 @@
 package org.pipesor.correlation.context.infrastructure.persistence.jpa;
 
+import org.pipesor.correlation.context.application.queries.CorrelatedRevision;
+import org.pipesor.correlation.context.application.queries.CorrelatedRevision.IntroducedSignal;
 import org.pipesor.correlation.context.domain.model.aggregates.CorrelationGroup;
 import org.pipesor.correlation.context.domain.model.aggregates.CorrelationGroup.Context;
+import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -13,10 +16,12 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** Own-store transactions only. Callers must authenticate scope/producer, validate references and sanitize summary. */
+/** Own-store transactions only. Callers must authenticate scope/producer, validate references and sanitize all text. */
 final class DurableCorrelationStore {
     private final DataSource dataSource;
     private final Clock clock;
@@ -27,11 +32,12 @@ final class DurableCorrelationStore {
     }
 
     record Contribution(Context context, String producerKey, UUID messageId, UUID evidenceId,
-                        String correlationId, String inputFingerprint, String snapshotSummary) {
+                        String correlationId, String inputFingerprint, String snapshotSummary, EvidenceSignal signal) {
         Contribution {
             Objects.requireNonNull(context, "Context is required");
             Objects.requireNonNull(messageId, "Message ID is required");
             Objects.requireNonNull(evidenceId, "Evidence ID is required");
+            Objects.requireNonNull(signal, "Evidence signal is required");
             if (producerKey == null || producerKey.isBlank() || correlationId == null || correlationId.isBlank()
                     || inputFingerprint == null || !inputFingerprint.matches("v1:sha256:[0-9a-f]{64}")
                     || snapshotSummary == null) {
@@ -78,6 +84,9 @@ final class DurableCorrelationStore {
                     return replay;
                 }
                 var snapshot = originalMember(connection, groupId, input.evidenceId());
+                if (snapshot != null && !snapshot.signal().equals(input.signal())) {
+                    throw new IllegalArgumentException("Correlation member conflicts with its original signal");
+                }
                 if (snapshot == null) {
                     var previous = latest(connection, groupId);
                     if (previous != null && !previous.id().equals(confirmedId)) {
@@ -88,13 +97,15 @@ final class DurableCorrelationStore {
                     group = group.include(input.context(), input.evidenceId());
                     snapshot = new CorrelatedContextEntity(UUID.randomUUID(), input.context().incidentId(),
                             input.context().executionId(), group.evidenceIds().stream().sorted().toArray(UUID[]::new),
-                            input.snapshotSummary(), input.correlationId(), now, groupId);
+                            input.snapshotSummary(), input.correlationId(), now, groupId, input.signal());
                     execute(connection, """
                             INSERT INTO evidence.correlated_contexts
-                            (id, incident_id, execution_id, evidence_ids, summary, correlation_id, created_at, group_id)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            (id, incident_id, execution_id, evidence_ids, summary, correlation_id, created_at, group_id,
+                             signal_stage, signal_summary, signal_content)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, snapshot.id(), snapshot.incidentId(), snapshot.executionId(),
-                            snapshot.evidenceIds(), snapshot.summary(), snapshot.correlationId(), now, groupId);
+                            snapshot.evidenceIds(), snapshot.summary(), snapshot.correlationId(), now, groupId,
+                            input.signal().stage(), input.signal().summary(), input.signal().content());
                 }
                 execute(connection, """
                         INSERT INTO evidence.correlation_receipts
@@ -120,6 +131,83 @@ final class DurableCorrelationStore {
             }
         } catch (SQLException failure) {
             throw new IllegalStateException("Correlation persistence is unavailable");
+        }
+    }
+
+    /** Internal projection only. Expected context must come from a future authorized boundary. */
+    CorrelatedRevision readRevision(Context expectedContext, UUID contextId) {
+        Objects.requireNonNull(expectedContext, "Context is required");
+        Objects.requireNonNull(contextId, "Context ID is required");
+        try (var connection = dataSource.getConnection()) {
+            connection.setReadOnly(true);
+            connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            connection.setAutoCommit(false);
+            try {
+                CorrelatedContextEntity target;
+                try (var statement = connection.prepareStatement("""
+                        SELECT c.* FROM evidence.correlated_contexts c
+                        JOIN evidence.correlation_groups g ON g.id = c.group_id
+                        WHERE c.id = ? AND g.scope_key = ? AND g.execution_id = ? AND g.incident_id = ?
+                        AND cardinality(c.evidence_ids) > 0 AND array_ndims(c.evidence_ids) = 1
+                        AND array_lower(c.evidence_ids, 1) = 1
+                        """)) {
+                    bind(statement, contextId, expectedContext.scope(), expectedContext.executionId(), expectedContext.incidentId());
+                    try (var rows = statement.executeQuery()) {
+                        if (!rows.next()) throw new IllegalStateException();
+                        target = readSnapshot(rows);
+                    }
+                }
+                var expectedIds = Set.of(target.evidenceIds());
+                var seen = new HashSet<UUID>();
+                var signals = new ArrayList<IntroducedSignal>();
+                try (var statement = connection.prepareStatement("""
+                        SELECT * FROM evidence.correlated_contexts WHERE group_id = ?
+                        AND cardinality(evidence_ids) <= ? AND array_ndims(evidence_ids) = 1
+                        AND array_lower(evidence_ids, 1) = 1 ORDER BY cardinality(evidence_ids)
+                        """)) {
+                    bind(statement, target.groupId(), target.evidenceIds().length);
+                    try (var rows = statement.executeQuery()) {
+                        while (rows.next()) {
+                            var origin = readSnapshot(rows);
+                            if (!origin.executionId().equals(expectedContext.executionId())
+                                    || !origin.incidentId().equals(expectedContext.incidentId())
+                                    || origin.evidenceIds().length != signals.size() + 1) {
+                                throw new IllegalStateException();
+                            }
+                            UUID evidenceId = null;
+                            try (var receipts = connection.prepareStatement("""
+                                    SELECT DISTINCT evidence_id, scope_key FROM evidence.correlation_receipts WHERE context_id = ?
+                                    """)) {
+                                bind(receipts, origin.id());
+                                try (var sources = receipts.executeQuery()) {
+                                    while (sources.next()) {
+                                        if (evidenceId != null || !expectedContext.scope().equals(sources.getString("scope_key"))) {
+                                            throw new IllegalStateException();
+                                        }
+                                        evidenceId = sources.getObject("evidence_id", UUID.class);
+                                        if (evidenceId == null) throw new IllegalStateException();
+                                    }
+                                }
+                            }
+                            if (evidenceId == null || !expectedIds.contains(evidenceId) || !seen.add(evidenceId)
+                                    || !Set.of(origin.evidenceIds()).equals(seen)
+                                    || origin.correlationId() == null || origin.correlationId().isBlank()) {
+                                throw new IllegalStateException();
+                            }
+                            signals.add(new IntroducedSignal(evidenceId, origin.id(), origin.correlationId(), origin.signal()));
+                        }
+                    }
+                }
+                if (!seen.equals(expectedIds) || signals.size() != target.evidenceIds().length) throw new IllegalStateException();
+                var result = new CorrelatedRevision(target.id(), target.groupId(), signals.size(), signals);
+                connection.commit();
+                return result;
+            } catch (SQLException | RuntimeException failure) {
+                connection.rollback();
+                throw new IllegalStateException("Correlation revision is unavailable");
+            }
+        } catch (SQLException failure) {
+            throw new IllegalStateException("Correlation revision is unavailable");
         }
     }
 
@@ -184,7 +272,8 @@ final class DurableCorrelationStore {
                         || !stored.incidentId().equals(input.context().incidentId())
                         || !rows.getObject("source_evidence", UUID.class).equals(input.evidenceId())
                         || !rows.getString("source_correlation").equals(input.correlationId())
-                        || !rows.getString("input_fingerprint").equals(input.inputFingerprint())) {
+                        || !rows.getString("input_fingerprint").equals(input.inputFingerprint())
+                        || !stored.signal().equals(input.signal())) {
                     throw new IllegalArgumentException("Correlation message conflicts with its original contribution");
                 }
                 return prepared(connection, stored, rows.getObject("confirmed_context_id", UUID.class));
@@ -233,7 +322,8 @@ final class DurableCorrelationStore {
             return new CorrelatedContextEntity(rows.getObject("id", UUID.class), rows.getObject("incident_id", UUID.class),
                     rows.getObject("execution_id", UUID.class), (UUID[]) evidence.getArray(),
                     rows.getString("summary"), rows.getString("correlation_id"),
-                    rows.getObject("created_at", OffsetDateTime.class).toInstant(), rows.getObject("group_id", UUID.class));
+                    rows.getObject("created_at", OffsetDateTime.class).toInstant(), rows.getObject("group_id", UUID.class),
+                    new EvidenceSignal(rows.getString("signal_stage"), rows.getString("signal_summary"), rows.getString("signal_content")));
         } finally {
             evidence.free();
         }

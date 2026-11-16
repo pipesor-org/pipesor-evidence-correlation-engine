@@ -250,12 +250,10 @@ Scope and acceptance:
 5. Independent review, fixes and README checks. Record actual results and source
    provenance; no publication, merge, cloud resource or deployment action.
 
-The next material decision is the exact safe diagnostic representation to freeze
-for Recommendation: whether the current seven snapshot fields with a concretely
-defined summary suffice, or which additional protected per-evidence signals are
-needed. That answer is required before the business write/handoff path; it does
-not block the approved isolated schema/store work. Numeric runtime horizons,
-permissions and retention activation are not selected by local fixture tests.
+The diagnostic representation decision below was subsequently approved locally.
+The historical verification records in this section retain their original
+baseline; current signal work is recorded after PR preparation. Numeric runtime
+horizons, permissions and retention activation are not selected by fixtures.
 
 Implementation completed locally and verified on 2026-11-16:
 
@@ -307,12 +305,54 @@ contract change is introduced by this increment.
 
 The companion [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13)
 publishes that evolution from source head `849414d6b67b27ecb18cb06e2a2bc5fd2e20bad7`.
-It must be reviewed before treating DD-023 as an integrated main baseline.
+That PR and service PR #5 subsequently merged; the current integrated baselines
+are Docs `174e7993984bed61e7d59b6139da204c1f6025aa` and Correlation
+`5034a852eaf94cfabb650e1b598565ca6d40863f`.
 `make all`, the 116 model tests and 19 isolated PostgreSQL checks passed again
 after reconciliation; the service's 28 checks also passed with the renamed
 source reference. Focused independent review found no material reconciliation
 findings. Publication of these PRs does not authorize merge, deployment or the
 next diagnostic-payload increment.
+
+### Frozen protected signals — approved local increment, 2026-11-16
+
+Goal: recover the exact protected signals behind an immutable cumulative
+revision without requiring a new upstream fetch. The user approved one minimal
+stage/summary/content projection per introducing snapshot, including DD-023's
+explicit narrow exception for owned processed text. Grouping, identity, serial
+preparation, original-member receipts and synchronous orchestration are retained.
+The [owning representation contract](deployment-contract.md#next-decision-the-frozen-diagnostic-representation)
+describes fields, provenance and remaining boundary requirements.
+
+Scope and acceptance:
+
+1. Evolve the owning model to 1.5.0, generate DBML/SQL/ER/dictionary and add V3;
+   preserve integrated V1/V2 and refuse legacy rows without recoverable signals.
+2. Freeze the introduced signal atomically with snapshot/receipt. Replay returns
+   the first result; aliases agree on signal or fail with no effects.
+3. Reconstruct an older revision in deterministic introduction order, checking
+   exact membership and expected scope/execution/incident; reject partial output.
+4. Verify migrations, immutable mapping, rollback, concurrency and failure cases
+   against disposable PostgreSQL, then independently review connected paths.
+
+Verification progress: source generation, eight Correlation generator tests and
+six isolated PostgreSQL 16.15/pgvector 0.8.7 Correlation checks passed. The current
+integrated Docs baseline independently reproduces nine global suite failures
+(three failures/six errors from missing RAG presentation labels) and one global
+PostgreSQL failure (old three-dimensional vector fixture versus the approved
+1536-dimensional constraint). These unrelated failures are not changed or
+reported as passing. `make test` in the actual changed source reproduced the
+same 3 failures/6 errors (117 total, 108 passed).
+
+Service `./mvnw verify` passed 38 checks with no failures, errors or skips:
+eight domain, eight migration/JPA, fifteen store and seven frozen-signal tests
+on disposable PostgreSQL 17.11. The coordinator inspected final Surefire XML and
+build output. V1/V2 are byte-identical to HEAD; the V3 guard matches the owning
+source helper. Sixty-eight affected local links/anchors and whitespace checks
+in both repositories passed. Independent review found no material product
+findings; a malformed-data test fixture was corrected before the final run.
+No real owner validation, NLP delivery, Recommendation receipt or public business
+route is introduced. Changes remain local; no publication, merge or deployment.
 
 Independent scope of the earlier continuation: worker added checks of evidence-array ownership and attempts
 to merge a changed representation into the existing immutable JPA snapshot.
