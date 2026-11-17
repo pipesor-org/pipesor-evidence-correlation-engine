@@ -7,6 +7,9 @@ the owned Flyway migrations and snapshot JPA mapping, a pure domain grouping rul
 and an internal transactional store for cumulative snapshots, source receipts
 and group confirmation. Each revision freezes the newly introduced evidence
 signal once; an internal read reconstructs the exact signals of an older revision.
+The approved scope increment also freezes each snapshot's historical tenant,
+installation, repository, optional pipeline and scope revision. This stored
+envelope does not establish current authorization.
 It does not yet receive NLP requests or deliver to
 Recommendation. The business boundary and handoff require the
 [contract decisions](docs/deployment-contract.md#local-contract-proposal-for-decision).
@@ -28,17 +31,17 @@ Maven Wrapper (Maven 3.10.0, Wrapper 3.3.4); Spring Boot 4.1.2 manages the depen
 set. Docker must be reachable for the PostgreSQL checks. The first run downloads
 Maven/dependencies and the `postgres:17.11` test image.
 
-Verified on 2026-11-16 with Java 25.0.5.0.3 and Docker 29.9.3:
+Verified on 2026-11-17 with Java 25.0.5.0.3 and Docker 29.9.3:
 
 ```bash
 ./mvnw verify
 ```
 
-Thirty-eight tests passed without failures, errors or skips: eight domain,
-eight migration/JPA, fifteen durable-store and seven frozen-signal checks. PostgreSQL 17.11 is
+Forty-six tests passed without failures, errors or skips: ten domain,
+eight migration/JPA, fifteen durable-store and thirteen frozen-signal/scope checks. PostgreSQL 17.11 is
 disposable via Testcontainers. They verify:
 
-- Fresh V1/V2/V3 application, reapplication and validation, exact owned tables and
+- Fresh V1/V2/V3/V4 application, reapplication and validation, exact owned tables and
   three FKs solely between Correlation tables; Hibernate validates the snapshot.
 - UUID/reference and UTC microsecond timestamp round-trips, defensive arrays,
   unchanged stored snapshots after detached merge, rollback and native
@@ -58,6 +61,10 @@ disposable via Testcontainers. They verify:
   Historical reads recover exactly their own members, original incorporation
   traces and protected signals; crossed or damaged fixtures fail without partial
   output. V3 refuses populated V2, preserving data, schema, guards and history.
+- Immutable historical scope, optional pipeline round-trip, crossed-resource
+  rejection in both store and SQL, unchanged earlier scopes after new revisions,
+  scoped alias concurrency and full rollback. V4 refuses populated V3 snapshots
+  while preserving data, schema, guard and migration history.
 
 The JPA test starts the actual non-web Spring context with an isolated datasource.
 Tests invoke Flyway explicitly with test-only history; production migration
@@ -79,11 +86,21 @@ NLP delivery and Recommendation handoff remain outside these checks.
 The durable group/receipt schema follows integrated DD-023 in
 [pipesor-docs](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-023),
 merged through [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13).
-The locally approved signal extension evolves that source to model 1.5.0; V3
-adds stage, protected summary and minimized protected content to each introducing
+The signal extension is integrated through [service PR #6](https://github.com/pipesor-org/pipesor-evidence-correlation-engine/pull/6)
+and [model PR #16](https://github.com/pipesor-org/pipesor-docs/pull/16). V3 adds
+stage, protected summary and minimized protected content to each introducing
 revision. V1/V2 remain unchanged. A populated V2 database is refused atomically
 because the original protected signal cannot be recovered from fingerprints.
+V4 similarly refuses existing V3 snapshots without an approved original-scope
+mapping; opaque group keys cannot supply missing tenant or authorization history.
 There is no purge, retention horizon, background retry or activation default.
+
+The later [DD-024](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-024)
+records an approved durable Recommendation receipt model. Its local model
+extension adds a typed signal array; this repository implements only the owned
+Correlation scope persistence, not Recommendation's receipt migration or receiver.
+The exact wire contract and authority/revocation behavior remain boundary work. See the
+[current contract state](docs/deployment-contract.md#current-reconciliation-state--2026-11-16).
 
 For documentation, check affected links and consistency with referenced sources,
 then run:

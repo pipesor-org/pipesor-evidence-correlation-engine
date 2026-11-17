@@ -1,6 +1,7 @@
 package org.pipesor.correlation.context.infrastructure.persistence.jpa;
 
 import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
+import org.pipesor.correlation.context.domain.model.valueobjects.ScopeEnvelope;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceException;
@@ -39,7 +40,7 @@ class CorrelatedContextPersistenceTest {
                 .defaultSchema("evidence")
                 .table("flyway_history_local_correlation")
                 .load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(4);
         context = new SpringApplicationBuilder(CorrelationApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
@@ -72,7 +73,9 @@ class CorrelatedContextPersistenceTest {
                 assertThat(columns).containsExactly("id:uuid:NO", "incident_id:uuid:NO",
                         "execution_id:uuid:NO", "evidence_ids:_uuid:NO", "summary:text:NO",
                         "correlation_id:text:NO", "created_at:timestamptz:NO", "group_id:uuid:NO",
-                        "signal_stage:text:NO", "signal_summary:text:NO", "signal_content:text:NO");
+                        "signal_stage:text:NO", "signal_summary:text:NO", "signal_content:text:NO",
+                        "scope_tenant_id:uuid:NO", "scope_github_installation_id:text:NO", "scope_github_repository_id:text:NO",
+                        "scope_pipeline_id:uuid:YES", "scope_revision:text:NO");
             }
             try (var rows = statement.executeQuery("""
                     SELECT table_schema || '.' || table_name FROM information_schema.tables
@@ -113,6 +116,7 @@ class CorrelatedContextPersistenceTest {
             assertThat(stored.createdAt()).isEqualTo(first.createdAt());
             assertThat(stored.groupId()).isEqualTo(first.groupId());
             assertThat(stored.signal()).isEqualTo(first.signal());
+            assertThat(stored.scope()).isEqualTo(first.scope());
             assertThat(entityManager.find(CorrelatedContextEntity.class, otherExecution.id()).executionId())
                     .isEqualTo(otherExecution.executionId());
         }
@@ -124,7 +128,7 @@ class CorrelatedContextPersistenceTest {
         var expectedEvidenceIds = evidenceIds.clone();
         var original = new CorrelatedContextEntity(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 evidenceIds, "Protected evidence references", "synthetic-correlation:aliases",
-                Instant.parse("2026-11-11T00:00:00.123456Z"), UUID.randomUUID(), signal());
+                Instant.parse("2026-11-11T00:00:00.123456Z"), UUID.randomUUID(), signal(), TestScopes.SCOPE);
 
         evidenceIds[0] = UUID.randomUUID();
         assertThat(original.evidenceIds()).containsExactly(expectedEvidenceIds);
@@ -145,7 +149,8 @@ class CorrelatedContextPersistenceTest {
         var changed = new CorrelatedContextEntity(original.id(), UUID.randomUUID(), UUID.randomUUID(),
                 new UUID[]{UUID.randomUUID()}, "Different protected evidence references",
                 "synthetic-correlation:changed", original.createdAt().plusSeconds(1), UUID.randomUUID(),
-                new EvidenceSignal("TESTING", "Changed protected summary", "Changed protected content"));
+                new EvidenceSignal("TESTING", "Changed protected summary", "Changed protected content"),
+                new ScopeEnvelope(UUID.randomUUID(), "789", "999", UUID.randomUUID(), "scope-v13"));
 
         try (var entityManager = entityManagers.createEntityManager()) {
             entityManager.getTransaction().begin();
@@ -164,6 +169,7 @@ class CorrelatedContextPersistenceTest {
             assertThat(stored.createdAt()).isEqualTo(original.createdAt());
             assertThat(stored.groupId()).isEqualTo(original.groupId());
             assertThat(stored.signal()).isEqualTo(original.signal());
+            assertThat(stored.scope()).isEqualTo(original.scope());
         }
     }
 
@@ -203,7 +209,8 @@ class CorrelatedContextPersistenceTest {
 
     @Test
     void databaseRejectsNullInEveryRequiredColumn() throws SQLException {
-        for (int index = 0; index < 11; index++) {
+        for (int index = 0; index < 16; index++) {
+            if (index == 14) continue;
             var eligible = snapshot(UUID.randomUUID(), UUID.randomUUID());
             try (var connection = connection(); var statement = connection.createStatement()) {
                 connection.setAutoCommit(false);
@@ -214,7 +221,8 @@ class CorrelatedContextPersistenceTest {
                         "'" + eligible.executionId() + "'", "ARRAY['" + eligible.evidenceIds()[0] + "']::uuid[]",
                         "'Protected evidence references'", "'synthetic-correlation'",
                         "TIMESTAMPTZ '2026-11-11 00:00:00+00'", "'" + eligible.groupId() + "'",
-                        "'BUILD'", "'Safe summary'", "'Safe content'"));
+                        "'BUILD'", "'Safe summary'", "'Safe content'", "'11111111-1111-1111-1111-111111111111'",
+                        "'123'", "'456'", "NULL", "'scope-v12'"));
                 values.set(index, "NULL");
                 var failure = assertThrows(SQLException.class, () -> statement.executeUpdate(
                         "INSERT INTO evidence.correlated_contexts VALUES (" + String.join(",", values) + ")"));
@@ -237,7 +245,7 @@ class CorrelatedContextPersistenceTest {
                         + "', NULL, now(), now())");
                 try (var insert = connection.prepareStatement("""
                         INSERT INTO evidence.correlated_contexts
-                        VALUES (?, ?, ?, ?, ?, ?, now(), ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, now(), ?, ?, ?, ?, '11111111-1111-1111-1111-111111111111', '123', '456', NULL, 'scope-v12')
                         """)) {
                     insert.setObject(1, eligible.id());
                     insert.setObject(2, eligible.incidentId());
@@ -259,7 +267,7 @@ class CorrelatedContextPersistenceTest {
         return new CorrelatedContextEntity(id, UUID.randomUUID(), executionId,
                 new UUID[]{UUID.randomUUID()},
                 "Protected evidence references", "synthetic-correlation:α/01",
-                Instant.parse("2026-11-11T00:00:00.123456Z"), UUID.randomUUID(), signal());
+                Instant.parse("2026-11-11T00:00:00.123456Z"), UUID.randomUUID(), signal(), TestScopes.SCOPE);
     }
 
     private static EvidenceSignal signal() { return new EvidenceSignal("BUILD", "Protected résumé α", "Protected build content — prueba 🧪"); }

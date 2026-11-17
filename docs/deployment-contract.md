@@ -90,8 +90,12 @@ Documented ownership from ADR-018 and `model/domain.yml.entities`:
 Integrated DD-023 adds `evidence.correlation_groups` and
 `evidence.correlation_receipts`, owned solely by this service (Docs main
 `174e7993984bed61e7d59b6139da204c1f6025aa`, including model PR #13).
-The approved local signal extension evolves the source to model 1.5.0; its
-three new snapshot fields and generated constraints are not yet integrated.
+The signal extension and V3 are integrated through model PR #16 and service
+PR #6, respectively. Current consulted revisions are Docs
+`60679a9a0bf45edd0ffb6b72a298433f7f4e1e7f` and Correlation
+`2d2f7eff17c0abccf322796826d4a64af869e4dc`. Docs model 1.6.0 also contains
+DD-024's Recommendation-owned receipt; that does not add Correlation tables or
+prove that Recommendation has implemented reception.
 
 One physical PostgreSQL instance is shared; queries and commands use logical CQRS. Writes are confined to owned tables; shared schemas do not grant cross-owner writes. Physical FKs may exist within a schema; cross-schema references are logical IDs, with no ORM navigation across contexts (ADR-018, DD-014, PD-031). `audit.audit_events` has shared cross-cutting ownership and is not assigned exclusively to this repository; exact shared audit-write mechanics remain pending PD-035. Inferred `pipeline_access_grants`, where listed, preserve `ia_only`/inferred status and pending PD-007/008. No persistent schema is added for technical processing services without documented ownership.
 
@@ -118,21 +122,277 @@ Before IaC consumes this contract, provide:
 3. Identifiable approval by the authority recorded in the committed pending-decision register: CODEOWNERS **Jhon Galvez and Ramiro Guzman** for backend–IaC coordination and applicable contracts. The rule for one versus both approvals and GitHub handles/enforcement is unknown; do not invent CODEOWNERS configuration. Reference the committed source revision and provide identifiable approval evidence for this delivery contract; source availability alone does not approve it.
 4. The applicable independent environment promotion approvals and separate authorization for any infrastructure action. Contract approval alone does not authorize deployment.
 
-**Approval evidence today: none for this service's delivery contract.** ADRs retain their recorded Accepted status; missing individual acceptance records remain PD-014. This document is sufficient to expose gaps while repository initialization proceeds; it is insufficient to claim deployability.
+**No deployment/runtime activation approval is recorded here.** DD-023 and
+DD-024 have the scoped approvals described below; they do not approve live
+integration or provisioning. ADRs retain their recorded Accepted status; missing
+individual acceptance records remain PD-014. This document is insufficient to
+claim deployability.
 
 ## Local contract proposal for decision
 
-**Candidate, 2026-11-11, with partial local adoption below.** Source revisions and task
-scope are in [architecture](architecture.md#local-implementation-task--2026-11-11).
-No new agreement was found that closes PD-010/031/034 for this receiver. The
-independent table/build increment does not accept the following proposals.
+**Historical candidate, 2026-11-11, with later scoped approvals below.** Source
+revisions and task scope are in
+[architecture](architecture.md#local-implementation-task--2026-11-11). Read the
+current state first; the historical proposals do not override later agreements
+or close PD-010/031/034 as a whole.
+
+### Current reconciliation state — 2026-11-16
+
+| Subject | State and evidence | Remaining work |
+|---|---|---|
+| Grouping, serial revisions and source receipts | **Integrated:** DD-023 and Correlation V2; exact trusted scope + execution/attempt + ORIGIN incident, immutable cumulative membership, original-member receipts and monotonic confirmation. | Real authorization/reference checks and downstream confirmation remain boundary work; do not reselect the grouping or delivery order. |
+| Minimal protected signal | **Integrated:** DD-023 supplement, model PR #16 and Correlation PR #6/V3. Each introducing snapshot freezes stage, protected summary and minimized content; historical reads recover exact membership. | Input protection, explicit payload budgets and transmission of this representation remain to be connected. No source timestamps or templates are added implicitly. |
+| Recommendation receipt | **Approved model:** [DD-024](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-024), Docs model 1.6.0. Operation equals context ID; matching replay is duplicate, conflicting content has no effects, and acceptance follows atomic persistence. | The complete versioned wire contract was not located, and the user has no copy. Reconstruct the missing definition from the recorded agreements and identify only uncovered details before implementing the adapter. This is not a request to reapprove DD-024. |
+| Receipt content versus frozen signals | **Integrated 1.6.0 lacks signals; approved local 1.7.0 adds them:** the typed JSON array and exact-membership constraints now express DD-024's recoverable projection. | Recommendation still needs its own migration/receiver under its owner scope. Source DDL checks do not prove real reception or diagnostic execution. |
+| Structured resource scope | **Approved local persistence implemented:** V4 freezes five typed fields per snapshot and readRevision recovers the original envelope. The group key remains opaque. | The trusted supplier, current authorization/revocation and owner-reference contracts remain open. Stored historical scope is not an authority decision. |
+| Owner references and evidence identity | **Still proposed/open:** PD-031 owner validation queries and Log/Event adoption of the evidence-ID rule have no usable contract in the consulted sources. | Settle owner-backed existence/membership and authorized scope, including late records, before accepting real requests. IDs and isolated fixtures do not establish existence or permission. |
+| Runtime implementation | **Internal foundation only:** Correlation has no NLP receiver or Recommendation adapter; Recommendation has a RAG client but no diagnostic receiver/persistence. | Implement each ready boundary under its agreed contract and owner scope, then verify isolated HTTP/PostgreSQL integration. No deployment is implied. |
+
+Consulted clean revisions: Correlation `2d2f7ef`, Docs `60679a9`,
+Recommendation `ffa2dd3`, RAG `822cdf5`, NLP `1d6e54f` and Log/Event `d1f0277`.
+The source lookup also inspected Docs PR #17/commit `60679a9`, its discussion and
+reviews, Recommendation branches/PRs and the repositories' issues. PR #17 changes
+the model and derived artifacts, not a complete wire DTO; no additional contract
+definition was found. The user confirmed no copy is available. DD-024's approval
+remains recorded; the exact missing definition is not treated as available.
+
+The reconciliation recommendation is one self-contained submission per immutable
+revision, preserving its exact protected signals and existing operation ID.
+Recommendation would durably preserve the representation it accepts before
+responding `accepted`. This is a proposal to complete the recoverable definition
+from the recorded v1 agreement, not authorization to add JSON storage, another table or a retrieval
+relationship. Keep the existing RAG client and receipt invariants.
+
+#### Proposed reconciliation package
+
+The following wire package remains **proposed, not an implemented DTO**. The
+17/11 approval below settles its local persistence representations, while leaving
+the boundary details open:
+
+- One submission carries the seven original snapshot values (`id`, `incident_id`,
+  `execution_id`, `evidence_ids`, operational `summary`, `correlation_id`,
+  `created_at`) and exactly the signals returned by that revision's internal
+  reader. Each signal preserves evidence ID, introducing context ID,
+  incorporation correlation ID, stage, protected summary and minimized content.
+  Use introduction order and verify the exact member set; no later signals,
+  template or new source timestamps are inferred.
+- The stable operation ID is the snapshot ID, as DD-024 already requires. No
+  separate operation/revision identity is introduced. `accepted` or `duplicate`
+  acknowledges the same context after durable commit, not a diagnosis.
+- The structured scope carries DD-024's tenant, installation, repository,
+  optional pipeline and scope revision. Its trusted supplier, verification and
+  recovery must be defined; those values cannot be parsed from `scope_key`.
+- Recommendation must preserve or recover everything the accepted representation
+  requires after a restart. The subsequent approved model extension below
+  selects five snapshot fields and a typed receipt array; it does not add a
+  fetch endpoint or implement Recommendation's receiver.
+
+| Remaining exact decision | Impact / recommended direction |
+|---|---|
+| What exact wire mapping carries the frozen signals? | Local model 1.7.0 now includes the approved typed receipt array. Match the wire projection and Recommendation migration/receiver to that source; no redesign of Correlation snapshots or second approval of the storage choice is needed. |
+| Who supplies verified structured scope, how is it bound/recovered for the same operation, and how is current authorization reevaluated? | Require a verifiable source and recoverable immutable request binding; no defaults or parsing of the opaque key. Reauthorization must not silently replace historical scope/content. |
+| What significant projection, canonical comparison and size/deadline limits apply? | Define one deterministic request codec and explicit budgets before the wire adapter. Do not select a hash projection, storage format or numeric limits by inference. RAG's 4000-character query limit is not the evidence budget. |
+
+Ready work is the documented field/approval reconciliation and isolated fixture
+design. Wire DTO/codec, sender activation, receiver persistence changes and real
+scope/reference acceptance depend only on their respective unresolved agreement
+or owner scope; the whole service is not blocked by an unrelated pending item.
+Acceptance must cover A then A+B with their exact signals and traces, response
+loss after remote commit followed by duplicate, restart recovery of the same
+operation/representation, conflict without effects, and no local confirmation
+before a valid remote durable receipt. Invalid or unavailable authorized
+references cannot become accepted snapshots or diagnostic calls.
+
+The wire comparison codec/fingerprint must cover the agreed significant
+representation deterministically. Recovery after a lost response or process
+restart must resend the same operation and historical representation; authorization
+must be checked again without silently rewriting that representation. The supplier
+and recovery of the structured scope envelope, including its revision, are not
+established by storing an opaque key or SHA-256 string.
+
+`accepted` means durable receipt, not completed diagnosis or successful RAG/LLM
+execution. It does not establish a worker, queue or eventual-diagnosis guarantee.
+Recommendation owns construction of the RAG query, whose existing limit is 4000
+characters. That query limit does not authorize truncating the accepted evidence
+or converting the aggregate `summary` into concatenated logs.
+
+Separate read-only finding for the Recommendation owner: its RAG client checks
+the 15-second budget before HTTP but can return a later success without checking
+again; a 14-second Retry-After followed by a 4-second response can return at
+18 seconds. The fixed per-attempt HTTP timeouts do not use the remaining budget.
+The coordinator reproduced this with a controlled test in a temporary copy of
+Recommendation `ffa2dd3`: mocked HTTP returned `503` with Retry-After 14, then a
+valid response while the test clock advanced four more seconds. The clock reached
+18 seconds and the call returned success instead of throwing unavailability.
+The regression assertion therefore failed as expected (one test, one failure,
+zero errors/skips); this is evidence of the bug, not a passing suite or live HTTP
+integration. No neighboring checkout is changed here. See the
+[client](https://github.com/pipesor-org/pipesor-recommendation-service/blob/main/src/main/java/com/pipesor/recommendation/retrieval/infrastructure/RestRagKnowledgeRetriever.java)
+and [configuration](https://github.com/pipesor-org/pipesor-recommendation-service/blob/main/src/main/java/com/pipesor/recommendation/configuration/RagClientConfiguration.java).
+
+<a id="scope-and-signal-persistence-proposal--2026-11-17"></a>
+
+### Scope and signal persistence — approved local increment, 2026-11-17
+
+**Approved locally for model evolution and Correlation persistence, 2026-11-17.**
+After the concrete five-field snapshot and typed receipt-array proposal, the user
+said “Dale, sigamos”. This approves the physical increment below, not the
+Recommendation implementation, wire contract or runtime authorization. This
+refines the reconciliation above without reselecting grouping, operation IDs,
+serial revisions or first accepted signals. No neighboring implementation is
+modified. The original v1 definition remains unavailable.
+
+#### Existing data and authority
+
+| Required handoff fact | Existing source | What the source does not prove |
+|---|---|---|
+| Tenant, installation and historical scope revision | NLP v2 `capture_context.tenant_id`, `github_installation_id`, `scope_revision` | A JSON value or authenticated NLP caller does not establish resource permission or current authorization. |
+| Repository | NLP v2 `pipeline.github_repository_id` | Existence, tenant/installation membership and permission still require owner-backed verification. |
+| Pipeline | NLP v2 `pipeline_id` | Preserve the supplied logical ID after verification; do not regenerate it from repository text or fabricate an absent value. DD-024 permits null in its more general receiver model. |
+| Current capture authorization | Ingestion's internal `CurrentMachineScope.verify(CaptureScope)` | It is not an exposed Correlation validation API. Its richer input also includes capture domain, App, account and workflow, so the smaller handoff envelope is not a substitute. |
+
+Sources: [NLP handoff](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/docs/integration-contracts.md#3-correlation-handoff),
+[Ingestion authority port](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/blob/main/src/main/java/org/pipesor/ingestion/capture/application/ports/CurrentMachineScope.java)
+and [authority readiness](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/blob/main/docs/deployment-contract.md).
+Ingestion `1066785908ff4a7f7f20b448df7154138ab093e0` explicitly records that no
+authorized scope configuration has been supplied. Its file-backed authority is
+local implementation, not a cross-service trust or revocation contract. Reuse
+the underlying authority agreement when available; do not copy a private file,
+share owner SQL, expose a new endpoint or add a permissive allowlist by inference.
+
+#### Why original-operation scope needs recovery
+
+Before this extension, consider snapshot A accepted under scope revision 12. If the same group partition
+remains applicable, an alias for the same evidence later arriving with revision
+13 resolves to A's original snapshot,
+as the original-member lookup requires. Building A's request using the alias's
+scope would change that operation's fingerprint. A restart also cannot recover
+revision 12 from an opaque group key or digest. Requiring the original NLP body
+on every recovery would introduce an extra recovery prerequisite and does not
+solve the alias case by itself.
+
+**Approved Correlation model extension:** freeze five typed scope fields on
+the introducing snapshot: `scope_tenant_id uuid`,
+`scope_github_installation_id text`, `scope_github_repository_id text`,
+`scope_pipeline_id uuid` and `scope_revision text`. Preserve DD-024's pipeline
+optionality where applicable; do not discard a verified supplied pipeline ID.
+All other scope values are required. Store them atomically with the existing
+snapshot/receipt, and reject changes to that snapshot's envelope. These are
+logical references with no cross-owner foreign keys. Do not replace or parse
+`scope_key`, or change the approved partition identity.
+
+This repeats a small envelope per revision intentionally: its authorization
+revision belongs to the historical operation, not a mutable group head. Splitting
+stable fields onto the group saves some repeated metadata but needs more joins
+and a separate agreement about their lifetime; a complete raw request cache
+copies more than the missing information. Five snapshot fields are the locally approved
+typed option under the current opaque-key contract. Owning source evolution
+precedes the new service migration; integrated V1–V3 remain unchanged.
+
+The internal store treats the envelope as significant historical source input.
+An existing message or evidence alias with a different original envelope,
+including its scope revision, conflicts without effects even if a supplied
+fingerprint is unchanged. A distinct new evidence member may use a different
+scope revision while retaining the same stable resource tuple. The original
+snapshot's envelope remains unchanged. Current reauthorization is not expressed
+by replacing these historical input fields; no HTTP outcome or authority adapter
+is selected by this internal consistency check.
+
+Current authorization must be checked separately on every replay/read/delivery
+that exposes protected data. A valid historical envelope alone is insufficient.
+A changed or revoked binding must never be silently rewritten, accepted by
+possession of the operation ID, or retried forever as an ordinary outage. Until
+the authority contract defines these outcomes and disposition, real delivery
+remains disabled. Persisting the envelope does not implement PD-031 validation.
+
+#### Recommended Recommendation representation
+
+The locally approved source-model extension adds one `signals jsonb` column to
+the existing receipt, holding
+only an ordered array of the already defined protected signal projection:
+evidence ID, introducing context ID, incorporation correlation ID, stage,
+protected summary and minimized content. This is a restricted, typed projection,
+not arbitrary JSON, the original request or raw logs. The source-model projection
+uses `evidence_id`, `origin_context_id`, `correlation_id`, `stage`, `summary` and
+`content`. Its exact wire field names,
+limits and validation must be agreed before implementation.
+
+The recommendation avoids another receipt/operation table and preserves DD-024's
+identity and immutable atomic acceptance. Application validation must require
+exact membership relative to `evidence_ids`, no duplicates, valid stage/text,
+original trace and deterministic introduction order; the source model must define
+the applicable JSON shape/constraints. Scope, snapshot values and signals commit
+before `accepted`. A matching replay returns `duplicate`; changed significant
+content conflicts without effects. A hash cannot replace recoverable signals.
+
+A normalized child table is an alternative when SQL queries or constraints on
+individual signals justify it; none of the inspected Recommendation code does
+that yet. It adds a table, rows and ownership constraints for the same reception.
+Keeping only IDs/summary would instead need an agreed retrieval relationship or
+an explicit reduction in diagnostic information. Neither is selected here.
+
+#### Approved implementation scope
+
+The user adopted the five typed snapshot scope fields and typed receipt signal
+array above for local source-model evolution and Correlation persistence.
+Correlation's extension follows DD-023, Recommendation's follows DD-024.
+This approval does not choose wire details or authority relationships.
+Neighboring Recommendation implementation still requires its own authorized
+scope; current neighboring write authorization covers NLP and Docs.
+
+The independently executable Correlation increment is
+source-model evolution, a new migration, immutable mapping/store/read changes
+and isolated PostgreSQL checks for frozen envelopes and alias/restart recovery.
+Do not alter integrated V1–V3. Existing rows lacking verifiable original scope
+need an approved mapping or atomic migration refusal; do not infer tenant or
+revision from current upstream data. No listener, fake authority, credentials,
+background worker or network integration is needed for this internal increment.
+Recommendation's receiver work follows its owner scope and approved source model.
+
+Required acceptance includes: A at revision 12 followed by alias A at revision
+13 never changes A's stored envelope; a later distinct member does not alter an
+earlier snapshot; restart reconstructs the original operation's scope and exact
+signals; crossed stable resource identity is rejected according to the agreed
+binding; failed receipt insertion leaves no partial envelope/signal; missing
+legacy provenance causes atomic refusal. Real authorization/revocation tests
+remain dependent on the authority contract, not replaceable by synthetic fixtures.
+
+The remaining boundary decisions are the trusted authority supplier and its
+current-versus-historical revision policy, owner-reference verification, exact
+wire/canonical comparison and explicit payload/deadline budgets. This package
+does not invent their values or claim that approving storage activates REST.
+
+#### Verification of the approved local increment
+
+Implemented against Docs `60679a9` plus local model 1.7.0 and Correlation
+`2d2f7ef` plus V4. The owned snapshot now has sixteen fields, with optional scope
+pipeline and fifteen required values. Scope, signal, snapshot and receipt commit
+atomically. Contradictory original envelopes fail without effects; a later
+member can advance scope revision within the same stable resource binding.
+
+- `./mvnw verify`: 46 tests passed, zero failures/errors/skips, Java 25 and
+  disposable PostgreSQL 17.11. Includes native SQL stable-binding rejection,
+  optional pipeline, immutable merge, history reconstruction, concurrent aliases,
+  full rollback and populated-V3 migration refusal preserving schema/data/guard/history.
+- Source `make db` passed and generated DBML, SQL, ER and dictionary. Nine
+  Correlation generation and 21 domain generation tests passed; seven Correlation
+  PostgreSQL checks and one Recommendation projection check passed on disposable
+  PostgreSQL 16.15/pgvector 0.8.7. The latter includes multi-member exact sets,
+  duplicate signals/IDs, nulls, multidimensional arrays and append-only refusal.
+- V1–V3 bytes remain unchanged. V4's snapshot guard matches the owning source.
+  These checks do not constitute Recommendation's migration or runtime receipt.
+
+No real scope authority, owner-reference query, NLP/Recommendation HTTP handoff,
+wire codec, deployment or purge was exercised. The known inherited global Docs
+RAG presentation/vector-fixture failures were not changed or rerun as part of
+these focused checks. Model and service changes remain local and unpublished.
 
 ### Local remediation agreements and implementation
 
 Following the assessment, the user explicitly adopted cumulative immutable
 group revisions and separation of stable protected source from mutable NLP
-enrichment. These are local agreements, not integrated cross-service contracts
-or closure of PD-010/031/034. The user authorized local edits in Correlation,
+enrichment. The grouping/storage agreements are now integrated under DD-023;
+they are not closure of PD-010/031/034 as a whole. The user authorized local edits in Correlation,
 NLP and `pipesor-docs` where necessary; other neighbors remain read-only.
 
 Group identity binds trusted machine scope, exact execution/attempt and automatic
@@ -148,8 +408,9 @@ snapshots, scoped message receipts and monotonic confirmation, with V2 following
 DD-023. V1 is unchanged. See [README](../README.md#development-and-verification)
 for current executed checks. The store does not authorize the opaque scope or
 validate external references. Fingerprints are supplied technical inputs; no
-real request comparator, listener or Recommendation adapter is enabled. The next
-decision concerns the safe diagnostic representation to preserve and deliver.
+real request comparator, listener or Recommendation adapter is enabled. The
+minimal safe representation is already approved and integrated; the remaining
+handoff reconciliation is recorded in the current-state section above.
 The internal adapter assigns group and snapshot UUIDv4 values with
 `UUID.randomUUID()` before insertion. Supplied message/evidence and operational
 IDs are preserved; this does not change upstream identity algorithms. The receipt
@@ -161,8 +422,9 @@ uses its natural scoped message key and needs no extra UUID.
 audit and concrete proposal, the user explicitly approved this representation
 and asked to continue to the next material decision. This adopts the two owned
 technical tables, snapshot association, derived revision, shared confirmation
-pointer and serial preparation policy. It is not integration into main,
-deployment approval or evidence of implemented/live reception.
+pointer and serial preparation policy. The resulting V2/source changes are now
+integrated; this historical approval is not deployment approval or evidence of
+implemented/live reception.
 The consulted source is Docs `65792190d2ee32f0721d22848cd62cee1fd0d630`, plus the
 separately inspected local agreements in its pending-decision register; that
 earlier overlay adopted grouping; the subsequent approval now also authorizes
@@ -305,16 +567,18 @@ selected by this proposal.
 
 A fingerprint cannot recover discarded enrichment. The locally approved
 representation below freezes a minimal protected signal at first incorporation.
-The versioned Recommendation request and durable receipt remain to be agreed
-before enabling the business handoff. No generic payload store is introduced.
+DD-024 subsequently records approval of the versioned Recommendation contract
+and durable receipt model. Its complete wire definition and signal preservation
+must be reconciled as described above before enabling the business handoff.
+No generic payload store is introduced.
 
 The approved physical increment implements the representation and serial
 policy, with conservative refusal of unmapped legacy rows and no purge/runtime
 activation. A duplicate member under a different message is associated with the
 original member revision; source comparison remains per scoped producer/message
 key. Technical choices do not require reopening that approval. The next material
-decision for integration is the versioned request/receipt carrying the approved
-representation; runtime identity, owner validation and live receipt integration remain separately
+work for integration is completing the unavailable wire definition from the
+recorded agreement and reconciling its recoverable representation; runtime identity, owner validation and live receipt integration remain separately
 bounded work, not claims made by these storage checks.
 
 The acceptance criteria cover concurrent first creation/member additions without
@@ -328,9 +592,9 @@ these local checks do not establish real owner validation or downstream receipt.
 
 <a id="next-decision-the-frozen-diagnostic-representation"></a>
 
-#### Frozen diagnostic representation — approved locally
+#### Frozen diagnostic representation — approved and integrated
 
-Approved locally on 2026-11-16: freeze one minimal protected signal on the
+Approved on 2026-11-16 and integrated through model PR #16/service PR #6: freeze one minimal protected signal on the
 snapshot that first introduces its evidence. This extends DD-023 explicitly;
 Log/Event continues to own original evidence. Textual overlap is intentional:
 Correlation owns the first accepted minimized processed projection needed for
@@ -355,8 +619,8 @@ repeatable delivery, without an evidence-fetch integration or full request copy.
 
 Callers must supply already protected and minimized text. Shape validation and
 redacted diagnostic strings do not constitute a sanitizer. Input/output size
-budgets, authorization/reference validation and the versioned synchronous
-Recommendation request/receipt must be specified before exposing the business
+budgets, authorization/reference validation and completion of the missing
+synchronous Recommendation request/receipt definition are required before exposing the business
 path. The approved storage representation does not prove diagnostic quality or
 live downstream receipt. No NLP storage/hash, generic payload, new table or RAG
 client is needed for this increment.
@@ -418,16 +682,14 @@ resumes that same snapshot rather than creating another. Concurrent requests
 must converge through an approved database uniqueness/claim strategy, not a
 process-local lock. Neither service may infer exactly-once HTTP delivery.
 
-The current seven-column `correlated_contexts` table cannot express this state:
-there is no message key, request digest, trusted scope or delivery phase. Proposed
-model direction is refined by the [durable grouping proposal](#durable-grouping-proposal-after-the-reuse-audit):
-a Correlation-owned receipt records the scoped producer/message key, individual
-source association, versioned input comparison and snapshot reference; the group
-records the shared delivery confirmation pointer. Delivery state is derived,
-not duplicated per receipt. This is **not** a migration specification or
-permission to create a table.
-The owning model must first settle physical fields, safe replay/provenance
-material, atomicity, retention, concurrency and recovery. Do not store raw input
+The original seven-column snapshot alone could not express this state. Integrated
+V2/DD-023 now supplies the Correlation-owned receipt with scoped producer/message
+key, source association, versioned input comparison and snapshot reference; the
+group stores the shared delivery-confirmation pointer. V3 adds the three frozen
+signal fields. Delivery state remains derived, not duplicated per receipt.
+The physical model, atomicity and local concurrency/recovery checks are implemented;
+the real comparison codec, safe boundary inputs, retention mechanism and remote
+recovery remain bounded work. Do not store raw input
 JSON or add it to `correlated_contexts`. Hashing a message does not preserve its
 provenance or make sensitive text safe. Comparison must cover the significant
 received protected fields: capture/context, operational and logical identity,
@@ -498,30 +760,34 @@ relationship is introduced.
 
 ### Correlation → Recommendation proposal
 
-Proposed single synchronous submission on the existing
-`rel_correlation_recommendation` (the diagnostic-api relationship is its component
-projection, not a second delivery): `POST /internal/v1/correlated-contexts`, JSON
-`contract_version: "1.0"`, stable `operation_id`, trusted authorized scope envelope,
-and `context` containing the seven snapshot fields (`id`, `incident_id`,
-`execution_id`, `evidence_ids`, `summary`, `correlation_id`, `created_at`). The URI
-and envelope are proposals, not an endpoint discovered in Recommendation. The
-scope supplier/encoding must be jointly specified; a body tenant ID is not proof.
-For an initial minimal context, `summary` should contain only agreed safe
-operational metadata, with no copied excerpts or template-based diagnosis.
-Whether Recommendation additionally requires processed signals/source timestamps
-must be decided before adopting this minimum; no evidence lookup API is implied.
+The original 11/11 candidate proposed `POST /internal/v1/correlated-contexts`,
+contract version `1.0`, an authorized scope envelope and seven snapshot fields.
+It also proposed Entra Bearer authentication, `Idempotency-Key=operation_id`,
+`X-Correlation-ID`, W3C trace context, `200 accepted|duplicate` and `409` for
+conflict. These details remain historical candidate text, not a substitute for
+the complete v1 contract whose approval DD-024 subsequently records. There is
+no implemented receiving endpoint in the consulted Recommendation revision.
 
-Proposed headers: Entra Bearer identity for a Recommendation-specific audience and
-role, `Idempotency-Key=operation_id`, original `X-Correlation-ID` and W3C trace
-context. Recommendation must enforce resource scope and durably recognize the
-operation/content before returning `200` with `status=accepted|duplicate` and the
-same `operation_id`/`context_id`. This receipt means durable context reception,
-not completed diagnosis. A pending/unconfirmed request cannot be declared
-accepted by Correlation. Conflicting content is `409`; authentication and
-temporary/permanent failures follow the same distinctions above. Timeout means
-unknown result, so recovery resends the same operation, never a fresh diagnosis
-request ID. Exact DTO, reception behavior and receipt storage belong to
-Recommendation under PD-010/034 and must be implemented there by its owner.
+Preserve the approved receipt invariants: one operation per snapshot with
+`operation_id=context_id`, atomic durable acceptance, matching replay without
+another write and conflict without effects. Timeout leaves the outcome unknown;
+recovery uses the same operation and representation, never a fresh diagnosis ID.
+Correlation may confirm local delivery only after a valid remote receipt.
+
+The seven-field candidate is not the full current Correlation representation:
+DD-023/V3 also freezes stage, protected summary and minimized content per
+evidence. The new receipt model has no equivalent signal representation, so
+complete the missing wire definition and reconcile this difference before implementing
+the handoff. Do not treat source timestamps or templates as newly approved fields.
+The trusted scope supplier/encoding and recoverability must also be explicit;
+a tenant in a body or an opaque scope key is not authorization evidence.
+
+The only documented business relationship remains the synchronous
+`rel_correlation_recommendation`; its diagnostic-api component projection is not
+a second delivery. Receipt storage/transaction and the receiver belong to
+Recommendation. A receipt is not completed diagnosis, and no evidence-fetch API
+or background processing guarantee is inferred. See the
+[current state](#current-reconciliation-state--2026-11-16) for remaining work.
 
 ### PD-031 decision proposal: owner-verified references
 
@@ -728,7 +994,7 @@ already verified persistence foundation.
 | 2. No executable evidence owner or diagnostic receiver | Log/Event and Recommendation README files explicitly state documentation-only status. NLP computes evidence UUIDv5 from its message ID, but Log/Event has not adopted/implemented that rule. Current local PostgreSQL tests create no upstream owner rows and prove no delivery. A seven-field stored snapshot is not proof that Recommendation receives enough protected signal to diagnose; no evidence-fetch relationship is implied. | Agree evidence identity with its owner; implement/test evidence persistence and the minimum owner-validation contract before claiming reference validation. Agree required safe diagnostic information and Recommendation receipt separately under PD-010/034. Doubles permit local checks, not end-to-end claims. |
 | 3. Missing references can be permanent operational outcomes | Pipeline's `ApplyExecutionSnapshotCommandHandler` can record `IGNORED_PAUSED`, reject `UNKNOWN_WORKFLOW` or require `LEGACY_ID_MAPPING_REQUIRED`. Ingestion broker publication does not wait for those consumer commits. UUID agreement does not ensure a row ever appears. | Preserve existing paused/registration rules. Distinguish demonstrated mismatch from unknown absence; agree a bounded recovery horizon and owned disposition when no row will be created. Do not invent missing rows or retry indefinitely. Blocks real processing of independently arriving events. |
 | 4. Machine authorization across service boundaries remains unspecified | Ingestion's file authority is approved and implemented, but that does not grant NLP/Correlation access to every resource or expose a machine-scope query to other owners. Human access and capture scope are separate. | Reuse the approved authority choice; agree trusted scope propagation/verification, caller audiences/roles and revocation timing for the selected validation mechanism. Runtime operator/values remain activation inputs. No need to reselect Ingestion storage or automatically add tenant columns. |
-| 5. Grouping decision identified by the assessment, now locally adopted | Current failed/timed-out evidence derives the automatic incident from the same execution ID. This supports that attempt's ORIGIN context; it does not identify an older incident for which another run is a VERIFICATION. | The user selected cumulative immutable multi-evidence revisions as recorded above; the domain rule is implemented. Durable group state/order remain pending. Multi-run remediation correlation needs its own association rule; the existing model's valid VERIFICATION links must remain valid. |
+| 5. Grouping decision identified by the assessment, now locally adopted | Current failed/timed-out evidence derives the automatic incident from the same execution ID. This supports that attempt's ORIGIN context; it does not identify an older incident for which another run is a VERIFICATION. | The user selected cumulative immutable multi-evidence revisions as recorded above; the domain rule, durable group state and serial order are now implemented under DD-023. Multi-run remediation correlation needs its own association rule; the existing model's valid VERIFICATION links must remain valid. |
 
 Sources supporting the assessment:
 
@@ -787,21 +1053,22 @@ proof merely to address minimum reference integrity.
 
 ### Decisions needed and responsible parties
 
-Each row is a specific decision; none is approval by analysis or by this local
-implementation. Jhon Galvez and Ramiro Guzman are the documented contractual
-authority for PD-010/031/034/035; the one-versus-both approval rule is unspecified.
+Rows distinguish settled scope from actual decisions still needed. Analysis and
+local code do not extend existing approvals. Jhon Galvez and Ramiro Guzman are
+the documented contractual authority for PD-010/031/034/035; the one-versus-both
+approval rule is unspecified.
 
-| Exact question / impact | Options and recommendation | Authority / dependent work |
+| Subject / exact question | Current state and recommendation | Authority / dependent work |
 |---|---|---|
 | Accept NLP's v2 route/body/headers and the completion/recovery semantics above? Without this, broker completion can lose downstream work. | Local durable acceptance with deferred delivery, or synchronous confirmed delivery plus recoverable receipt. Recommend the latter to preserve the canonical synchronous flow. | PD-034, Jhon/Ramiro; NLP and Correlation owners coordinate. Blocks receiver, not owned-table foundation. |
-| Where will scoped message identity, content comparison and delivery state live, with what physical constraints, precision and retention? | Evolve snapshot or separate owner receipt. Recommend a separate receipt if grouping is selected; first approve source-model evolution and canonical comparison. | PD-031/034/035 and model owner. Blocks durable receipt/acceptance; this task cannot modify docs repository. |
+| Scoped message identity and durable state | **Integrated:** DD-023/V2 group and receipts, V3 minimal signals; the physical representation and serial order are settled. The real significant-input codec and receipt lifecycle remain open; do not redesign the tables to resolve them. | Existing user approvals and integrated model. PD-034/035 apply only to remaining codec, budgets and lifecycle; local Docs edits were separately authorized. |
 | How can Correlation verify authorized tenant/repository/run/attempt/incident/evidence membership, including not-yet-arrived data? | The [PD-031 proposal](#pd-031-decision-proposal-owner-verified-references) recommends owner validation queries after explicit architectural approval: the current graph cannot carry post-commit owner confirmations. Propose retryable unavailability for late/unknown references, without a new pending queue. Scope/provenance sources still require agreement. | PD-031 Jhon/Ramiro for contract; architecture authority must be identified for the new relationships. Pipeline and Log/Event own their implementations. No usable validation contract exists today. |
 | Does Log/Event accept the UUIDv5 evidence-ID rule already computed by NLP? | Adopt the proposed rule or agree an owner-issued identity through the declared exchange. Recommend confirming the compatible rule with Log/Event; no ID changes here. | Log/Event owner, PD-031/032/033; no owner approval found. |
-| Accept the proposed Recommendation request, minimal information, scope binding and durable response? | Self-contained safe snapshot versus a reference requiring an agreed retrieval relationship. Recommend a single self-contained submission; settle needed signals and idempotency first. | PD-010/034 Jhon/Ramiro with Recommendation owner. Blocks synchronous adapter/recovery tests. |
-| What is the first correlation unit and what causes delivery/version closure? | Locally adopted by the user: cumulative immutable revisions by trusted scope, execution/attempt and automatic ORIGIN incident; each distinct verified evidence grows the set. No completeness/closure claim. The pure domain rule is implemented; durable state and revision delivery order remain to be specified. | Explicit session approval for this local rule; not blanket approval of the receiver, physical model or Recommendation contract. |
+| Where is the complete approved Recommendation v1 definition, and how are its signals and structured scope recovered? | **Approval recorded in DD-024:** operation identity, atomic receipt and duplicate/conflict invariants. No complete source was found and the user has no copy; complete only the missing signal representation, scope binding, codec and limits. Recommend a self-contained recoverable revision; do not infer a new fetch relationship or repeat approval of settled invariants. | PD-010/034 authorities with Recommendation owner. Blocks dependent wire adapter/receiver work, not documentation reconciliation. |
+| Correlation unit, revision order and closure | **Integrated:** exact scope + execution/attempt + ORIGIN grouping, each new verified evidence grows an immutable cumulative set, and preparation waits for prior confirmation. No completeness or closure claim. | Existing user approvals and DD-023; do not reopen. They do not approve unrelated receiver/security contracts. |
 | What issuer/audiences/roles and trusted resource-scope evidence, payload limits and timeout/retry horizons apply? | Agree explicit fail-closed values versus keep integration disabled. Recommend explicit values before enabling REST; no permissive defaults. | PD-034/035 Jhon/Ramiro with security/backend/IaC owners; not settled by Entra as a technology choice. |
 
-Concrete examples to decide the correlation rule: identical template/commit/time
+Acceptance examples for the settled correlation rule: identical template/commit/time
 across different tenants, repositories, runs or attempts must remain separate;
 two distinct verified evidence members in the same approved group produce
 cumulative immutable revisions; a repeated member does not grow the set. Receipt

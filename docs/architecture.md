@@ -1,5 +1,107 @@
 # Architecture consumption
 
+## Current handoff reconciliation — 2026-11-16
+
+Current integrated state, checked after the historical work recorded below:
+
+| Source | Consulted main revision | Implemented / approval boundary |
+|---|---|---|
+| Correlation | `2d2f7eff17c0abccf322796826d4a64af869e4dc` | PR #6 integrated V3, first protected signals and exact revision reconstruction; V2 group/receipt semantics remain integrated. No business receiver or remote handoff. |
+| [Docs](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md) | `60679a9a0bf45edd0ffb6b72a298433f7f4e1e7f` | PR #16 integrated DD-023's signals; model 1.6.0/DD-024 subsequently records approved Recommendation receipt. The complete approved wire DTO was not located in consulted source files. |
+| [Recommendation](https://github.com/pipesor-org/pipesor-recommendation-service/blob/main/README.md) | `ffa2dd3a34069ce226abaadb98420f1eef751d99` | RAG client/token/retries; no diagnostic receiver, receipt persistence or inference. Client completion is not completion of Recommendation. |
+| [RAG](https://github.com/pipesor-org/pipesor-rag-retrieval/blob/main/README.md) | `822cdf51411b6ae0304ced1cbd0e7cb25d152080` | Retrieval API, knowledge persistence, embeddings/auth adapters and image automation. Live grants/corpus/deployment are separate activation requirements. |
+
+The [owning reconciliation record](deployment-contract.md#current-reconciliation-state--2026-11-16)
+distinguishes integrated rules, recorded approvals, missing contract material and
+genuine open decisions. The older plans and verification counts below retain
+their dated scope; they do not override this current state.
+
+Task scope: reconcile the existing Correlation and Recommendation agreements
+before implementing their boundary. Preserve grouping, exact identities, serial
+revisions, first accepted signals and receipt invariants. No model change, new
+wire contract, owner SQL, neighboring implementation, publication or deployment
+is authorized by this documentation increment.
+
+Plan and acceptance:
+
+1. **Complete:** inspect both implementations and DD-023/024, preserving existing
+   approvals. Update obsolete current-state claims; retain historical proposals
+   as antecedents rather than active requests to reselect settled behavior.
+2. **Complete lookup; definition unavailable:** source files, Docs PR #17/commit
+   `60679a9`, discussions/reviews, Recommendation branches/PRs and issues yielded
+   no complete wire DTO. The user has no copy. Preserve DD-024's recorded
+   approval and use the explicit proposed reconciliation package in the owning
+   contract to complete only missing definition, not invalidate the approval.
+3. **Dependent:** specify only uncovered wire/codec/budget/recovery behavior.
+   The same operation and historical representation must survive response loss
+   and restart. Scope must be reauthorized without silently changing that
+   representation; an opaque scope key cannot supply missing tenant/repository
+   identities. Do not add a table or fetch API by inference.
+4. **After contract readiness and owner authorization:** implement ready sender
+   and receiver portions, then check isolated HTTP and durable PostgreSQL receipt
+   together. Required cases include exact A then A+B signals, duplicate after
+   lost committed response, conflict without effects, restart recovery, rejection
+   of invalid scope/references and no local confirmation without a valid remote
+   receipt. `accepted` does not prove diagnosis or successful RAG execution.
+
+Verification evidence from the immediately preceding review: `./mvnw verify`
+passed 38 tests with zero failures/errors/skips on disposable PostgreSQL 17.11;
+eight Correlation source-generation tests passed against Docs `60679a9`.
+The service reviewer found no material code defects in the implemented isolated
+foundation. Those checks were not repeated for these documentation-only edits;
+affected links, source coherence and whitespace are checked instead. No live
+authorization, owner reference validation, NLP handoff or Recommendation receipt
+was exercised. The Recommendation budget defect was subsequently reproduced with
+mocked HTTP and a controlled clock in a temporary copy, not a neighboring checkout.
+Its single regression assertion failed as expected when a success arrived at 18
+seconds under the 15-second budget. This is bug evidence, not a passing suite or
+live HTTP test; the owning reconciliation record carries the details.
+
+### Scope and persistence implementation — 2026-11-17
+
+The follow-up investigation found the five downstream scope values already in
+NLP's candidate handoff. Ingestion has a current-scope port and local adapter,
+but no cross-service validation contract; its documented authority configuration
+is still unavailable. This is data availability with a separate trust gap, not
+permission to trust forwarded fields or create owner queries.
+
+The [concrete proposal](deployment-contract.md#scope-and-signal-persistence-proposal--2026-11-17)
+specifies five immutable typed scope fields per Correlation snapshot and a typed
+signal array on Recommendation's existing receipt. The user subsequently adopted
+this local source-model and Correlation persistence increment with “Dale, sigamos”. The alias/restart case explains why historical scope cannot simply come
+from whichever message triggers a retry. No approved group identity is changed.
+
+Current implementation plan:
+
+1. Evolve Docs model/generator constraints, DD-023/024 supplements and fixtures;
+   regenerate derived files through their owning tools. No other owner behavior
+   or RAG constraint changes.
+2. Add an immutable scope value and snapshot mapping, transactional store binding
+   and exact historical reads. Existing-message/member contradictions fail with
+   no effects; a new member may have a new scope revision within the same stable
+   resource binding. Current authorization remains a caller precondition.
+3. Add V4 without changing V1–V3. Refuse populated legacy snapshots atomically
+   unless original scope mapping is separately approved; never fabricate it.
+4. Verify isolated PostgreSQL round-trip, null pipeline, conflict, rollback,
+   concurrency and historical recovery, plus immutable migration bytes and
+   source/service guard agreement. Independently review connected paths.
+
+Implementation and verification completed locally on 2026-11-17. Service
+`./mvnw verify` passed 46 tests with no failures, errors or skips on disposable
+PostgreSQL 17.11. Source model 1.7.0 generation passed, as did 30 focused unit
+checks and eight PostgreSQL 16.15/pgvector 0.8.7 checks. The coordinator inspected
+Surefire XML/build output; V1–V3 are unchanged and V4's guard matches the source.
+The independent reviewer checked isolation, original envelopes, exact signals,
+rollback and migration refusal. A missing multi-member JSON-membership test was
+added and passed before handoff; no material product finding remained.
+Final coherence checks passed: 73 affected local links/anchors and whitespace
+in both repositories. Neighboring NLP and Recommendation working trees remain
+unchanged.
+Real wire/authority readiness and Recommendation code scope remain separately
+dependent. No HTTP activation, owner query, credentials, publication or deployment
+is part of this increment. The owning contract records detailed acceptance and
+verification limits.
+
 ## Local implementation task — 2026-11-11
 
 Scope: start the NLP → Correlation → Recommendation path without adopting an
@@ -305,7 +407,7 @@ contract change is introduced by this increment.
 
 The companion [model PR #13](https://github.com/pipesor-org/pipesor-docs/pull/13)
 publishes that evolution from source head `849414d6b67b27ecb18cb06e2a2bc5fd2e20bad7`.
-That PR and service PR #5 subsequently merged; the current integrated baselines
+That PR and service PR #5 subsequently merged; the integrated baselines at that point
 are Docs `174e7993984bed61e7d59b6139da204c1f6025aa` and Correlation
 `5034a852eaf94cfabb650e1b598565ca6d40863f`.
 `make all`, the 116 model tests and 19 isolated PostgreSQL checks passed again
@@ -352,7 +454,8 @@ source helper. Sixty-eight affected local links/anchors and whitespace checks
 in both repositories passed. Independent review found no material product
 findings; a malformed-data test fixture was corrected before the final run.
 No real owner validation, NLP delivery, Recommendation receipt or public business
-route is introduced. Changes remain local; no publication, merge or deployment.
+route was introduced. This was the local verification record before publication;
+service PR #6 and model PR #16 subsequently merged. No deployment is evidenced.
 
 Independent scope of the earlier continuation: worker added checks of evidence-array ownership and attempts
 to merge a changed representation into the existing immutable JPA snapshot.
