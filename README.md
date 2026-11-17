@@ -10,8 +10,9 @@ signal once; an internal read reconstructs the exact signals of an older revisio
 The approved scope increment also freezes each snapshot's historical tenant,
 installation, repository, optional pipeline and scope revision. This stored
 envelope does not establish current authorization.
-It does not yet receive NLP requests or deliver to
-Recommendation. The business boundary and handoff require the
+It includes a manually constructed Recommendation client with strict receipt
+validation and bounded HTTP; no NLP receiver or authorized delivery workflow is
+activated. The business boundary and handoff still require the
 [contract decisions](docs/deployment-contract.md#local-contract-proposal-for-decision).
 No container image or release automation is introduced.
 
@@ -37,8 +38,9 @@ Verified on 2026-11-17 with Java 25.0.5.0.3 and Docker 29.9.3:
 ./mvnw verify
 ```
 
-Forty-six tests passed without failures, errors or skips: ten domain,
-eight migration/JPA, fifteen durable-store and thirteen frozen-signal/scope checks. PostgreSQL 17.11 is
+Sixty-six tests passed without failures, errors or skips: ten domain,
+eight migration/JPA, fifteen durable-store, eighteen frozen-revision,
+confirmation and capacity checks, four codec and eleven isolated HTTP checks. PostgreSQL 17.11 is
 disposable via Testcontainers. They verify:
 
 - Fresh V1/V2/V3/V4 application, reapplication and validation, exact owned tables and
@@ -66,6 +68,26 @@ disposable via Testcontainers. They verify:
   scoped alias concurrency and full rollback. V4 refuses populated V3 snapshots
   while preserving data, schema, guard and migration history.
 
+The codec checks compare Java bytes and SHA-256 with the Python reference vectors,
+preserve Unicode/control escaping and reject malformed projections/receipts. HTTP
+checks use an actual loopback server fixture for receipt correspondence, explicit
+recovery of the same request, redirects, caps, delayed headers/body and safe error
+classification. They do not exercise Recommendation's database or real identity.
+The client has no bean, endpoint/token defaults or retries; constructor bounds are
+mandatory. Fixture bounds are not an approved operating policy, and token
+acquisition/current authorization remain outside this adapter.
+
+The internal confirmation handler covers already prepared revisions with an
+authorized caller. Three PostgreSQL tests use a delivery double to exercise
+unknown delivery, invalid receipts and recovery after a failed local
+confirmation. They verify that pending state does not advance without a
+matching receipt and that replay confirms the original revision.
+
+Guarded preparation uses the actual canonical outbound byte count. Tests
+cover an exact-fit revision, full rollback when a new revision exceeds the
+supplied limit, and recovery of existing receipts after changing the limit.
+The test capacities do not select an operating ceiling.
+
 The JPA test starts the actual non-web Spring context with an isolated datasource.
 Tests invoke Flyway explicitly with test-only history; production migration
 runner/history coordination remains PD-035. Containers are removed after checks.
@@ -77,11 +99,12 @@ business startup command yet. The mapping is package-private infrastructure, not
 an authorized input/write API or sanitizer. The store is package-private and is
 not registered as a business bean or listener. Callers must authenticate scope
 and producer, validate owner references/ORIGIN membership and sanitize summaries.
-Tests use synthetic metadata and supplied comparison fingerprints; no real
-request comparator or canonicalization is implemented. Local technical
+Store tests use synthetic metadata and supplied NLP input fingerprints; the real
+source-input comparator remains unimplemented. The separate outgoing request
+codec is implemented and checked against reference vectors. Local technical
 confirmation is not evidence of Recommendation reception. Tenant authorization,
 foreign-reference existence, business timestamp nanosecond preservation, real
-NLP delivery and Recommendation handoff remain outside these checks.
+NLP delivery and Recommendation receipt persistence remain outside these checks.
 
 The durable group/receipt schema follows integrated DD-023 in
 [pipesor-docs](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-023),
@@ -96,11 +119,32 @@ mapping; opaque group keys cannot supply missing tenant or authorization history
 There is no purge, retention horizon, background retry or activation default.
 
 The later [DD-024](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-024)
-records an approved durable Recommendation receipt model. Its local model
-extension adds a typed signal array; this repository implements only the owned
-Correlation scope persistence, not Recommendation's receipt migration or receiver.
-The exact wire contract and authority/revocation behavior remain boundary work. See the
+records an approved durable Recommendation receipt model. Its extension
+integrated through [model PR #18](https://github.com/pipesor-org/pipesor-docs/pull/18)
+adds a typed signal array. Correlation's isolated client and Recommendation's
+local durable receiver passed a cross-repo test recovering the same committed
+operation after a lost response. Operating budgets, overflow disposition and
+current authority remain boundary work. See the
 [current contract state](docs/deployment-contract.md#current-reconciliation-state--2026-11-16).
+
+The approved HTTP mapping and comparison are reviewable in the
+[candidate OpenAPI](docs/contracts/correlation-recommendation-v1.candidate.json)
+and [synthetic vectors](docs/contracts/correlation-recommendation-v1.examples.json).
+The artifact retains its candidate filename for traceability; activation remains
+blocked on runtime policy and authority. With Python 3
+and the existing local `jsonschema` package (verified with 4.19.2), run:
+
+```bash
+python3 tools/check_handoff_contract.py
+```
+
+This checks JSON schemas, request/header/receipt correspondence, exact signal
+membership/origin structure and proposed comparison vectors using synthetic data.
+The Python checker is neither complete OpenAPI validation nor an HTTP, authorization, persistence
+or recovery integration test. It adds no application dependency; the isolated Java client separately uses
+Boot-managed Jackson databind. Payload and
+response budgets, cumulative overflow disposition, retry/deadline policy and
+current authority remain explicit pending decisions in the candidate record.
 
 For documentation, check affected links and consistency with referenced sources,
 then run:

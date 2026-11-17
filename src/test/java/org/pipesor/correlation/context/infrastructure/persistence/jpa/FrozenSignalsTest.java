@@ -1,6 +1,10 @@
 package org.pipesor.correlation.context.infrastructure.persistence.jpa;
 
 import org.flywaydb.core.Flyway;
+import org.pipesor.correlation.context.application.commandhandlers.ConfirmPreparedDelivery;
+import org.pipesor.correlation.context.application.ports.RecommendationDelivery;
+import org.pipesor.correlation.context.infrastructure.delivery.RecommendationCapacity;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.pipesor.correlation.context.application.queries.CorrelatedRevision;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -83,6 +87,12 @@ class FrozenSignalsTest {
         assertThat(revision.contextId()).isEqualTo(second.snapshot().id());
         assertThat(revision.groupId()).isEqualTo(first.snapshot().groupId());
         assertThat(revision.revision()).isEqualTo(2);
+        assertThat(revision.incidentId()).isEqualTo(second.snapshot().incidentId());
+        assertThat(revision.executionId()).isEqualTo(second.snapshot().executionId());
+        assertThat(revision.summary()).isEqualTo(second.snapshot().summary());
+        assertThat(revision.correlationId()).isEqualTo(b.correlationId()).isNotEqualTo("alias-safe-trace");
+        assertThat(revision.createdAt()).isEqualTo(second.snapshot().createdAt());
+        assertThat(revision.toString()).isEqualTo("CorrelatedRevision[redacted]");
         assertThat(revision.signals()).containsExactly(
                 new CorrelatedRevision.IntroducedSignal(a.evidenceId(), first.snapshot().id(), a.correlationId(), a.signal()),
                 new CorrelatedRevision.IntroducedSignal(b.evidenceId(), second.snapshot().id(), b.correlationId(), b.signal()));
@@ -91,7 +101,9 @@ class FrozenSignalsTest {
                 .extracting(CorrelatedRevision.IntroducedSignal::evidenceId).containsExactly(a.evidenceId(), b.evidenceId(), c.evidenceId());
         assertThrows(UnsupportedOperationException.class, () -> revision.signals().clear());
         var source = new ArrayList<>(revision.signals());
-        var copy = new CorrelatedRevision(revision.contextId(), revision.groupId(), revision.revision(), source, TestScopes.SCOPE);
+        var copy = new CorrelatedRevision(revision.contextId(), revision.groupId(), revision.revision(), source,
+                TestScopes.SCOPE, revision.incidentId(), revision.executionId(), revision.summary(),
+                revision.correlationId(), revision.createdAt());
         source.clear();
         assertThat(copy).isEqualTo(revision);
     }
@@ -409,6 +421,120 @@ class FrozenSignalsTest {
             }
         }
         return values;
+    }
+
+    @Test
+    void unknownDeliveryRemainsPendingAndDuplicateRecoveryConfirmsTheOriginalRevision() {
+        var input = input(context(), "BUILD");
+        var prepared = store.prepare(input);
+        var original = store.readRevision(input.context(), prepared.snapshot().id());
+        var attempts = new AtomicInteger();
+        var sent = new ArrayList<CorrelatedRevision>();
+        RecommendationDelivery remote = (revision, token) -> {
+            sent.add(revision);
+            if (attempts.incrementAndGet() == 1) {
+                throw new RecommendationDelivery.Failure(RecommendationDelivery.Failure.Kind.UNKNOWN);
+            }
+            return new RecommendationDelivery.Receipt(revision.contextId(), revision.contextId(),
+                    RecommendationDelivery.Status.DUPLICATE);
+        };
+        var handler = new ConfirmPreparedDelivery(remote, store::confirm);
+        assertThrows(RecommendationDelivery.Failure.class, () -> handler.execute(original, "synthetic-token"));
+        assertThat(store.prepare(input).confirmed()).isFalse();
+        assertThrows(IllegalStateException.class, () -> store.prepare(input(input.context(), "TESTING")));
+        var recovered = new DurableCorrelationStore(dataSource, Clock.systemUTC())
+                .readRevision(input.context(), original.contextId());
+        assertThat(handler.execute(recovered, "synthetic-token").status()).isEqualTo(RecommendationDelivery.Status.DUPLICATE);
+        assertThat(sent).containsExactly(original, original);
+        assertThat(store.prepare(input).confirmed()).isTrue();
+        assertThat(store.prepare(input(input.context(), "TESTING")).revision()).isEqualTo(2);
+    }
+
+    @Test
+    void invalidRemoteReceiptsNeverConfirmPreparedState() {
+        var input = input(context(), "BUILD");
+        var prepared = store.prepare(input);
+        var revision = store.readRevision(input.context(), prepared.snapshot().id());
+        var confirmations = new AtomicInteger();
+        var receipts = new ArrayList<RecommendationDelivery.Receipt>();
+        receipts.add(null);
+        receipts.add(new RecommendationDelivery.Receipt(revision.contextId(), revision.contextId(), null));
+        receipts.add(new RecommendationDelivery.Receipt(UUID.randomUUID(), revision.contextId(), RecommendationDelivery.Status.ACCEPTED));
+        receipts.add(new RecommendationDelivery.Receipt(revision.contextId(), UUID.randomUUID(), RecommendationDelivery.Status.DUPLICATE));
+        for (var receipt : receipts) {
+            var handler = new ConfirmPreparedDelivery((sent, token) -> receipt,
+                    (group, context) -> confirmations.incrementAndGet());
+            var failure = assertThrows(RecommendationDelivery.Failure.class,
+                    () -> handler.execute(revision, "synthetic-token"));
+            assertThat(failure.kind()).isEqualTo(RecommendationDelivery.Failure.Kind.UNKNOWN);
+            assertThat(failure.getCause()).isNull();
+        }
+        assertThat(confirmations.get()).isZero();
+        assertThat(store.prepare(input).confirmed()).isFalse();
+        assertThrows(IllegalStateException.class, () -> store.prepare(input(input.context(), "TESTING")));
+    }
+
+    @Test
+    void localConfirmationFailureCanRecoverTheSameRemoteOperation() {
+        var input = input(context(), "BUILD");
+        var prepared = store.prepare(input);
+        var revision = store.readRevision(input.context(), prepared.snapshot().id());
+        var sent = new ArrayList<CorrelatedRevision>();
+        RecommendationDelivery remote = (value, token) -> {
+            sent.add(value);
+            return new RecommendationDelivery.Receipt(value.contextId(), value.contextId(),
+                    sent.size() == 1 ? RecommendationDelivery.Status.ACCEPTED : RecommendationDelivery.Status.DUPLICATE);
+        };
+        var failing = new ConfirmPreparedDelivery(remote, (group, context) -> {
+            throw new IllegalStateException("private storage detail");
+        });
+        var failure = assertThrows(IllegalStateException.class, () -> failing.execute(revision, "synthetic-token"));
+        assertThat(failure.getMessage()).isEqualTo("Correlation delivery confirmation is unavailable");
+        assertThat(failure.getCause()).isNull();
+        assertThat(store.prepare(input).confirmed()).isFalse();
+        var recovered = new ConfirmPreparedDelivery(remote, store::confirm);
+        assertThat(recovered.execute(store.readRevision(input.context(), revision.contextId()), "synthetic-token").status())
+                .isEqualTo(RecommendationDelivery.Status.DUPLICATE);
+        assertThat(store.prepare(input).confirmed()).isTrue();
+        assertThat(sent).containsExactly(revision, revision);
+    }
+
+    @Test
+    void firstPreparationChecksExactCanonicalCapacityAndRollsBackBeforeCommit() throws SQLException {
+        var input = input(context(), "BUILD");
+        var before = counts(dataSource);
+        var size = new AtomicInteger();
+        var failure = assertThrows(RecommendationCapacity.Exceeded.class, () -> store.prepare(input, revision -> {
+            size.set(new RecommendationCapacity(20_000).encodedSize(revision));
+            new RecommendationCapacity(size.get() - 1).accept(revision);
+        }));
+        assertThat(failure.getMessage()).isEqualTo("Prepared revision exceeds supplied request capacity");
+        assertThat(failure.getCause()).isNull();
+        assertThat(counts(dataSource)).isEqualTo(before);
+        var prepared = store.prepare(input, new RecommendationCapacity(size.get()));
+        var original = store.readRevision(input.context(), prepared.snapshot().id());
+        assertThat(new RecommendationCapacity(size.get()).encodedSize(original)).isEqualTo(size.get());
+        assertThat(counts(dataSource)).containsExactly(before.get(0) + 1, before.get(1) + 1, before.get(2) + 1);
+    }
+
+    @Test
+    void growthCapacityRefusalPreservesConfirmedHistoryAndExistingMessagesBypassNewCapacity() throws SQLException {
+        var a = input(context(), "BUILD");
+        var first = store.prepare(a, new RecommendationCapacity(20_000));
+        store.confirm(first.snapshot().groupId(), first.snapshot().id());
+        var original = store.readRevision(a.context(), first.snapshot().id());
+        int firstBytes = new RecommendationCapacity(20_000).encodedSize(original);
+        var before = counts(dataSource);
+        var b = input(a.context(), "TESTING");
+        assertThrows(RecommendationCapacity.Exceeded.class, () -> store.prepare(b, new RecommendationCapacity(firstBytes)));
+        assertThat(counts(dataSource)).isEqualTo(before);
+        assertThat(store.readRevision(a.context(), original.contextId())).isEqualTo(original);
+        assertThat(store.prepare(a, revision -> { throw new AssertionError("Replay must not reapply capacity"); }).confirmed()).isTrue();
+        var alias = new DurableCorrelationStore.Contribution(a.context(), "alias-producer", UUID.randomUUID(),
+                a.evidenceId(), "alias-trace", a.inputFingerprint(), "ignored aggregate derivation", a.signal(), a.scope());
+        assertThat(store.prepare(alias, revision -> { throw new AssertionError("Alias must not reapply capacity"); })
+                .snapshot().id()).isEqualTo(original.contextId());
+        assertThat(store.prepare(b, new RecommendationCapacity(20_000)).revision()).isEqualTo(2);
     }
 
     private static Context context() { return new Context("synthetic-scope-" + UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()); }

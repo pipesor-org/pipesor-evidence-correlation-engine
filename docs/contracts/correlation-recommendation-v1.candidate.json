@@ -1,0 +1,444 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Correlation to Recommendation v1 — mapping approved, activation pending",
+    "version": "1.0",
+    "description": "The user approved this HTTP mapping and restricted comparison for an isolated Java client on 2026-11-17. Runtime activation remains blocked on authority/reference validation, request/response/member/deadline budgets and overflow disposition. The candidate filename records the artifact origin; it does not authorize a receiving endpoint or deployment."
+  },
+  "x-pipesor-state": "mapping-approved-activation-blocked",
+  "x-pipesor-sources": {
+    "correlation_revision": "3508506",
+    "docs_revision": "505232c",
+    "decisions": [
+      "DD-023",
+      "DD-024"
+    ]
+  },
+  "x-pipesor-pending-decisions": [
+    "Trusted authority supplier, issuer/audience/role/caller values, current reauthorization and revocation treatment.",
+    "Request/response byte limits; protected field sizes; cumulative evidence/signal count; total operation deadline and retry schedule; and disposition when a growing revision exceeds the accepted budget, before preparation. No RAG query or NLP client limit is adopted. No truncation, member loss, window, group split or infinite retry is inferred."
+  ],
+  "x-pipesor-invariants": [
+    "operation_id equals context.id and Idempotency-Key. X-Correlation-ID equals context.correlation_id.",
+    "Signal evidence IDs are unique and exactly equal context.evidence_ids. Signal order is introduction order, not lexical order. A receiver cannot prove historical order or owner existence from JSON shape.",
+    "Every replay/read/delivery must be currently authorized independently of the historical scope envelope. No protected cached result is returned before authorization.",
+    "Confirmation requires a complete valid 200 JSON receipt with matching IDs and accepted or duplicate. Non-JSON, empty 200, unknown status or mismatched IDs cannot confirm delivery.",
+    "Timeout, connection failure or an ambiguous 5xx leaves reception unknown; recover the same operation and historical representation. No retry budget is selected here.",
+    "Do not follow redirects with bearer credentials. Receipt durability does not introduce a background worker, queue or eventual diagnosis guarantee.",
+    "Serialize context.correlation_id from the original snapshot. An alias or retry message correlation ID must not replace it; each signal preserves its incorporation correlation ID.",
+    "Introducing context IDs are unique; the last signal origin_context_id equals context.id and its correlation_id equals context.correlation_id. These are structural consequences of one new member per snapshot, not proof of owner existence or earlier historical order."
+  ],
+  "paths": {
+    "/internal/v1/correlated-contexts": {
+      "post": {
+        "operationId": "receiveCorrelatedContextCandidate",
+        "description": "Proposed single synchronous handoff on the existing relationship; no second component delivery or evidence-fetch API.",
+        "security": [
+          {
+            "entraBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CanonicalUuid"
+            },
+            "description": "Must equal operation_id and context.id."
+          },
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SafeId"
+            },
+            "description": "Must equal context.correlation_id."
+          },
+          {
+            "name": "traceparent",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional W3C technical trace context; not operation identity, authorization evidence or fingerprint input."
+          },
+          {
+            "name": "tracestate",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional W3C technical trace context; not operation identity, authorization evidence or fingerprint input."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "After atomic durable commit: accepted or matching duplicate. Receipt IDs must match the sent operation and context. This is not completed diagnosis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or incompatible contract; no durable acceptance. Proposed permanent rejection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Caller authentication failed; no receipt or protected context disclosure. Do not retry unchanged credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller/resource authorization failed; no receipt or existence disclosure. Do not infer a new grant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An existing operation/context conflicts with significant content. No effects and no new operation ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request exceeds a pending explicitly agreed limit. No silent truncation; no automatic retry of unchanged content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Capacity unavailable. Delay/retry count and total deadline remain pending; no durable receipt is implied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Temporary dependency/reception unavailability. Result may be unknown; recover the same immutable operation rather than create another.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "entraBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Entra app-only identity. Real issuer, audience, role, caller binding and resource authority remain unresolved; no placeholder values grant access."
+      }
+    },
+    "schemas": {
+      "CanonicalUuid": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        "minLength": 36,
+        "maxLength": 36
+      },
+      "SafeId": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "not": {
+          "pattern": "[^A-Za-z0-9._:-]"
+        }
+      },
+      "ProtectedText": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S",
+        "description": "Already minimized and protected text. Shape validation is not sanitization; exact whitespace and Unicode are preserved. U+0000 is excluded because the receiving PostgreSQL text/JSON representation cannot retain it.",
+        "not": {
+          "pattern": "\u0000"
+        }
+      },
+      "AuthorizationScope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenant_id",
+          "github_installation_id",
+          "github_repository_id",
+          "pipeline_id",
+          "scope_revision"
+        ],
+        "properties": {
+          "tenant_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "github_installation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "pattern": "^[1-9]",
+            "not": {
+              "pattern": "[^0-9]"
+            }
+          },
+          "github_repository_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "pattern": "^[1-9]",
+            "not": {
+              "pattern": "[^0-9]"
+            }
+          },
+          "pipeline_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CanonicalUuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scope_revision": {
+            "$ref": "#/components/schemas/SafeId"
+          }
+        }
+      },
+      "Context": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "incident_id",
+          "execution_id",
+          "evidence_ids",
+          "summary",
+          "correlation_id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "incident_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "execution_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "evidence_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/CanonicalUuid"
+            },
+            "description": "Proposed lexical canonical UUID order in the wire copy only. The persisted snapshot is a set and may use Java UUID ordering; do not mutate it to encode the request. Signals retain introduction order."
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ProtectedText"
+          },
+          "correlation_id": {
+            "$ref": "#/components/schemas/SafeId"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$",
+            "description": "Proposed canonical UTC representation of the existing technical snapshot timestamp; six fractional digits preserve PostgreSQL microseconds.",
+            "minLength": 27,
+            "maxLength": 27
+          }
+        }
+      },
+      "Signal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "origin_context_id",
+          "correlation_id",
+          "stage",
+          "summary",
+          "content"
+        ],
+        "properties": {
+          "evidence_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "origin_context_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "correlation_id": {
+            "$ref": "#/components/schemas/SafeId"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "BUILD",
+              "TESTING",
+              "QUALITY_GATE",
+              "DEPLOYMENT",
+              "CONTAINER",
+              "INFRASTRUCTURE"
+            ]
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ProtectedText"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ProtectedText"
+          }
+        }
+      },
+      "Submission": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contract_version",
+          "operation_id",
+          "authorization_scope",
+          "context",
+          "signals"
+        ],
+        "properties": {
+          "contract_version": {
+            "const": "1.0",
+            "type": "string"
+          },
+          "operation_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "authorization_scope": {
+            "$ref": "#/components/schemas/AuthorizationScope"
+          },
+          "context": {
+            "$ref": "#/components/schemas/Context"
+          },
+          "signals": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Signal"
+            },
+            "description": "Exactly one protected signal per evidence ID, in original introduction order. No later members, template, raw body or new source timestamps."
+          }
+        }
+      },
+      "Receipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contract_version",
+          "operation_id",
+          "context_id",
+          "status"
+        ],
+        "properties": {
+          "contract_version": {
+            "const": "1.0",
+            "type": "string"
+          },
+          "operation_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "context_id": {
+            "$ref": "#/components/schemas/CanonicalUuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "duplicate"
+            ]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_context",
+              "unauthenticated",
+              "forbidden",
+              "operation_conflict",
+              "payload_too_large",
+              "capacity_unavailable",
+              "temporarily_unavailable"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "x-pipesor-approval": {
+    "date": "2026-11-17",
+    "instruction": "Aprobado, seguimos",
+    "scope": "HTTP mapping, strict compatibility and restricted comparison; isolated Java client only",
+    "exclusions": [
+      "Runtime activation and environment values",
+      "Authority and reference-validation contracts",
+      "Operational budgets and overflow disposition",
+      "Recommendation implementation"
+    ]
+  },
+  "x-pipesor-comparison": {
+    "scope": "Only the validated Submission JSON body, including business correlation, historical scope, snapshot and exact ordered signals. Never reuse the NLP input_fingerprint.",
+    "rendering": "Reject duplicate JSON keys, non-JSON numeric constants, unpaired Unicode surrogates, noncanonical UUIDs, timestamp shape, unsorted wire evidence IDs and unknown fields first. No UTF-8 BOM. Preserve all string code points and whitespace: no trim or Unicode normalization. Sort object keys (all schema keys are ASCII); emit compact JSON with no insignificant spaces, UTF-8 and non-ASCII characters unescaped. Escape quote and backslash; use \\b, \\t, \\n, \\f and \\r for those C0 controls and lowercase \\u00xx for the remaining C0 controls. Preserve array order; pipeline_id is explicitly present even when null. Golden canonical strings/UTF-8 hashes are in the companion synthetic examples.",
+    "fingerprint": "v1:sha256: followed by lowercase hexadecimal SHA-256 of the defined bytes. HTTP Authorization and W3C trace headers are excluded. The example metadata retains its original proposed_* names for traceability; these are not wire fields."
+  }
+}
