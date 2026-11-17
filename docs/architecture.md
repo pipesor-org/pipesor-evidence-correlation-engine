@@ -1,5 +1,133 @@
 # Architecture consumption
 
+## Capacity before snapshot commit and remaining intake work
+
+Scope: verify the exact outbound representation before committing a new
+revision when the caller supplies an explicit capacity guard. The same
+transaction sees its provisional snapshot and receipt. A failed guard leaves
+no new durable state. Existing receipts and evidence aliases recover their
+original revision without a second admission decision. A future workflow
+must share one agreed admission ceiling with the Recommendation client.
+
+The [intake and activation plan](deployment-contract.md#remaining-work-for-nlp-intake-and-activation)
+records current owner capabilities, authorization, overflow and deadline
+options. Those choices remain proposed. A guarded preparation does not
+authenticate NLP, grant scope, or resolve operating budgets.
+
+Verification: `./mvnw verify` passed 66 tests, including two new tests using
+PostgreSQL 17.11 and the real canonical codec. The checks cover exact byte
+capacity, rollback, preservation of prior confirmation and matching replay
+and aliases. The contract fixture check and whitespace validation also passed.
+
+## Confirmation of an already prepared revision
+
+This local increment connects the approved Recommendation receipt to the
+existing Correlation confirmation operation. It accepts a frozen application
+projection, an access token from an authorized caller and the existing
+persistence confirmation callback. The future caller remains responsible for
+validating scope and logical references before using protected data.
+
+Acceptance covers a pending revision after an unreadable or crossed receipt,
+explicit replay of the same revision after delivery failure, and recovery
+when the downstream receipt is valid but local confirmation fails. A valid
+receipt must name the same operation and context and carry an accepted status.
+Confirmation keeps its existing monotonic PostgreSQL behavior. Preparation,
+NLP intake, authority implementation and capacity policy are separate work.
+
+Verification: `./mvnw verify` passed 64 tests, including the three new
+confirmation cases with PostgreSQL 17.11 and a delivery double. The previous
+cross-repo test remains the evidence for the actual Recommendation transport.
+
+## Isolated HTTP client — local increment, 2026-11-17
+
+The user approved the concrete HTTP mapping and restricted comparison with
+“Aprobado, seguimos”. This supersedes the earlier candidate-only status below;
+operational bounds, overflow disposition and current authority remain unresolved.
+The machine-readable artifact records approval and blocks runtime activation.
+
+Scope and acceptance:
+
+1. Complete the immutable application projection with the original incident,
+   execution, summary, snapshot correlation and creation time. Read those fields
+   from the target snapshot in the same consistent transaction, without exposing
+   JPA or replacing them with alias-message metadata. Redact projection strings.
+2. Implement one application delivery port and an isolated HTTP/JSON adapter,
+   reusing JDK 25 HttpClient and Boot-managed Jackson. Require explicit positive
+   request/response caps and timeout; no defaults or activation bean. Values in
+   tests are synthetic mechanical bounds, not approved operational budgets.
+3. Send the frozen operation once, with the caller-supplied current token.
+   Credential acquisition and resource reauthorization remain outside this client.
+   Its elapsed-time bound covers serialization, exchange, body and validation,
+   not a promise about an unimplemented token/authority workflow. Never retry or
+   confirm store state automatically.
+4. Verify exact cross-language bytes/hash, strict receipt correspondence, safe
+   failures, no redirect credential forwarding, bounded request/response and
+   delayed/lost-response cases against isolated loopback HTTP. The HTTP receiver
+   in these tests is a fixture, not Recommendation or proof of durable reception.
+5. Independently review and run README checks. Keep migrations/source models and
+   neighboring repositories unchanged; no publication or deployment.
+
+Implementation and verification completed locally. `./mvnw verify` passed 61
+tests (zero failures/errors/skips): the 46 persistence/domain baseline checks,
+four codec checks and eleven loopback HTTP checks. Java canonical bytes/hashes
+match the approved Python vectors. Projection metadata is read consistently and
+all existing migrations are unchanged. Spring starts with no delivery bean.
+
+Independent review found a definitive-rejection classification gap when error
+bodies exceeded capacity or stalled. Status is now classified before body
+consumption and a new test covers 401/403/409 in both cases. The final review
+found no material remaining findings and inspected final Surefire/build evidence.
+The checker and whitespace checks passed. HTTP uses a synthetic receiver; no
+current authority, live Recommendation receipt or database commit was proved.
+No neighbor, activation configuration, publication or deployment changed. The
+owning contract records remaining operating/authority prerequisites.
+
+## HTTP handoff contract preparation — 2026-11-17
+
+Historical preparation stage, superseded by the approved implementation above.
+
+Integrated baselines revalidated against remote main: Correlation
+`35085065d9f53efbfd44b7725c4ebfdc8d796f3c` (PR #7) and Docs
+`505232c9adb053c8134b2bf1503e1b7f0f48db1d` (PR #18/model 1.7.0).
+The scope/signal model and Correlation V4 are integrated. Recommendation remains
+at `ffa2dd3` with a RAG client and no context receiver.
+
+The user authorized concrete HTTP definition and acceptance preparation. Scope:
+one candidate OpenAPI document, synthetic examples/reference comparison vectors,
+a runnable contract check and the owning decision record. These are proposed
+boundary details, not an accepted protocol, sender activation, new persistence,
+Recommendation implementation or deployment. Preserve every integrated grouping,
+receipt, scope and signal invariant.
+
+Plan and acceptance:
+
+1. **Complete research:** map frozen scope, snapshot fields and exact signals;
+   preserve snapshot correlation on retries rather than the triggering message's
+   correlation. Separate source-input and downstream-request fingerprints.
+2. **Complete candidate/checks:** the strict candidate request/receipt shapes,
+   proposed comparison vectors, safe error classes and unknown-result recovery
+   are reviewable in OpenAPI and synthetic fixtures. The local checker passed;
+   this is reference evidence, not production interoperability or integration.
+3. **Decision required before runtime:** settle wire/compatibility/comparison,
+   payload/response/member/deadline limits, overflow disposition and the authority
+   supplying current scope/reference verification. No producer source inspected
+   defines a supported cumulative payload maximum. Do not truncate, window,
+   split snapshots or use infinite transient rejection by inference.
+4. **After agreement:** add a complete application projection and sender, test
+   isolated transport and receipt failure, then coordinate Recommendation's
+   migration/receiver with its owner. `CorrelatedRevision` currently lacks some
+   snapshot fields; do not expose the JPA entity to complete an application DTO.
+
+The [owning candidate record](deployment-contract.md#concrete-http-candidate--2026-11-17)
+links the machine-readable artifact and acceptance matrix. Verification passed
+with `python3 tools/check_handoff_contract.py` using existing Python/jsonschema
+4.19.2, 45 affected local links/anchors and `git diff --check`. Independent review
+found and closed trailing-newline identifier acceptance and missing structural
+origin checks; the final candidate has no material findings. No Java/POM or
+neighboring source changed, so Maven was not rerun. A complete OpenAPI validator
+was not available; JSON-schema and explicit document/invariant checks are the
+actual scope. The historical verification records below retain their dates.
+
 ## Current handoff reconciliation — 2026-11-16
 
 Current integrated state, checked after the historical work recorded below:

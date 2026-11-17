@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /** Own-store transactions only. Callers must authenticate scope/producer, validate references and sanitize all text. */
 final class DurableCorrelationStore {
@@ -51,6 +52,15 @@ final class DurableCorrelationStore {
     record Prepared(CorrelatedContextEntity snapshot, int revision, boolean confirmed) { }
 
     Prepared prepare(Contribution input) {
+        return prepareInternal(input, null);
+    }
+
+    /** Pure local capacity check only; it runs before commit and never for an existing operation. */
+    Prepared prepare(Contribution input, Consumer<CorrelatedRevision> capacity) {
+        return prepareInternal(input, Objects.requireNonNull(capacity, "Capacity check is required"));
+    }
+
+    private Prepared prepareInternal(Contribution input, Consumer<CorrelatedRevision> capacity) {
         try (var connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -86,6 +96,7 @@ final class DurableCorrelationStore {
                     return replay;
                 }
                 var snapshot = originalMember(connection, groupId, input.evidenceId());
+                boolean newSnapshot = snapshot == null;
                 if (snapshot != null && !snapshot.signal().equals(input.signal())) {
                     throw new IllegalArgumentException("Correlation member conflicts with its original signal");
                 }
@@ -123,6 +134,15 @@ final class DurableCorrelationStore {
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """, input.context().scope(), input.producerKey(), input.messageId(), input.evidenceId(),
                         input.correlationId(), snapshot.id(), input.inputFingerprint(), now);
+                if (newSnapshot && capacity != null) {
+                    CorrelatedRevision candidate;
+                    try {
+                        candidate = readRevision(connection, input.context(), snapshot.id());
+                    } catch (RuntimeException unavailable) {
+                        throw new IllegalStateException("Correlation revision is unavailable");
+                    }
+                    capacity.accept(candidate);
+                }
                 var result = prepared(connection, snapshot, confirmedId);
                 connection.commit();
                 return result;
@@ -153,64 +173,7 @@ final class DurableCorrelationStore {
             connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
             connection.setAutoCommit(false);
             try {
-                CorrelatedContextEntity target;
-                try (var statement = connection.prepareStatement("""
-                        SELECT c.* FROM evidence.correlated_contexts c
-                        JOIN evidence.correlation_groups g ON g.id = c.group_id
-                        WHERE c.id = ? AND g.scope_key = ? AND g.execution_id = ? AND g.incident_id = ?
-                        AND cardinality(c.evidence_ids) > 0 AND array_ndims(c.evidence_ids) = 1
-                        AND array_lower(c.evidence_ids, 1) = 1
-                        """)) {
-                    bind(statement, contextId, expectedContext.scope(), expectedContext.executionId(), expectedContext.incidentId());
-                    try (var rows = statement.executeQuery()) {
-                        if (!rows.next()) throw new IllegalStateException();
-                        target = readSnapshot(rows);
-                    }
-                }
-                var expectedIds = Set.of(target.evidenceIds());
-                var seen = new HashSet<UUID>();
-                var signals = new ArrayList<IntroducedSignal>();
-                try (var statement = connection.prepareStatement("""
-                        SELECT * FROM evidence.correlated_contexts WHERE group_id = ?
-                        AND cardinality(evidence_ids) <= ? AND array_ndims(evidence_ids) = 1
-                        AND array_lower(evidence_ids, 1) = 1 ORDER BY cardinality(evidence_ids)
-                        """)) {
-                    bind(statement, target.groupId(), target.evidenceIds().length);
-                    try (var rows = statement.executeQuery()) {
-                        while (rows.next()) {
-                            var origin = readSnapshot(rows);
-                            if (!origin.executionId().equals(expectedContext.executionId())
-                                    || !origin.incidentId().equals(expectedContext.incidentId())
-                                    || origin.evidenceIds().length != signals.size() + 1
-                                    || !origin.scope().sameResource(target.scope())) {
-                                throw new IllegalStateException();
-                            }
-                            UUID evidenceId = null;
-                            try (var receipts = connection.prepareStatement("""
-                                    SELECT DISTINCT evidence_id, scope_key FROM evidence.correlation_receipts WHERE context_id = ?
-                                    """)) {
-                                bind(receipts, origin.id());
-                                try (var sources = receipts.executeQuery()) {
-                                    while (sources.next()) {
-                                        if (evidenceId != null || !expectedContext.scope().equals(sources.getString("scope_key"))) {
-                                            throw new IllegalStateException();
-                                        }
-                                        evidenceId = sources.getObject("evidence_id", UUID.class);
-                                        if (evidenceId == null) throw new IllegalStateException();
-                                    }
-                                }
-                            }
-                            if (evidenceId == null || !expectedIds.contains(evidenceId) || !seen.add(evidenceId)
-                                    || !Set.of(origin.evidenceIds()).equals(seen)
-                                    || origin.correlationId() == null || origin.correlationId().isBlank()) {
-                                throw new IllegalStateException();
-                            }
-                            signals.add(new IntroducedSignal(evidenceId, origin.id(), origin.correlationId(), origin.signal()));
-                        }
-                    }
-                }
-                if (!seen.equals(expectedIds) || signals.size() != target.evidenceIds().length) throw new IllegalStateException();
-                var result = new CorrelatedRevision(target.id(), target.groupId(), signals.size(), signals, target.scope());
+                var result = readRevision(connection, expectedContext, contextId);
                 connection.commit();
                 return result;
             } catch (SQLException | RuntimeException failure) {
@@ -220,6 +183,69 @@ final class DurableCorrelationStore {
         } catch (SQLException failure) {
             throw new IllegalStateException("Correlation revision is unavailable");
         }
+    }
+
+    private static CorrelatedRevision readRevision(Connection connection, Context expectedContext, UUID contextId)
+            throws SQLException {
+        CorrelatedContextEntity target;
+        try (var statement = connection.prepareStatement("""
+                SELECT c.* FROM evidence.correlated_contexts c
+                JOIN evidence.correlation_groups g ON g.id = c.group_id
+                WHERE c.id = ? AND g.scope_key = ? AND g.execution_id = ? AND g.incident_id = ?
+                AND cardinality(c.evidence_ids) > 0 AND array_ndims(c.evidence_ids) = 1
+                AND array_lower(c.evidence_ids, 1) = 1
+                """)) {
+            bind(statement, contextId, expectedContext.scope(), expectedContext.executionId(), expectedContext.incidentId());
+            try (var rows = statement.executeQuery()) {
+                if (!rows.next()) throw new IllegalStateException();
+                target = readSnapshot(rows);
+            }
+        }
+        var expectedIds = Set.of(target.evidenceIds());
+        var seen = new HashSet<UUID>();
+        var signals = new ArrayList<IntroducedSignal>();
+        try (var statement = connection.prepareStatement("""
+                SELECT * FROM evidence.correlated_contexts WHERE group_id = ?
+                AND cardinality(evidence_ids) <= ? AND array_ndims(evidence_ids) = 1
+                AND array_lower(evidence_ids, 1) = 1 ORDER BY cardinality(evidence_ids)
+                """)) {
+            bind(statement, target.groupId(), target.evidenceIds().length);
+            try (var rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    var origin = readSnapshot(rows);
+                    if (!origin.executionId().equals(expectedContext.executionId())
+                            || !origin.incidentId().equals(expectedContext.incidentId())
+                            || origin.evidenceIds().length != signals.size() + 1
+                            || !origin.scope().sameResource(target.scope())) {
+                        throw new IllegalStateException();
+                    }
+                    UUID evidenceId = null;
+                    try (var receipts = connection.prepareStatement("""
+                            SELECT DISTINCT evidence_id, scope_key FROM evidence.correlation_receipts WHERE context_id = ?
+                            """)) {
+                        bind(receipts, origin.id());
+                        try (var sources = receipts.executeQuery()) {
+                            while (sources.next()) {
+                                if (evidenceId != null || !expectedContext.scope().equals(sources.getString("scope_key"))) {
+                                    throw new IllegalStateException();
+                                }
+                                evidenceId = sources.getObject("evidence_id", UUID.class);
+                                if (evidenceId == null) throw new IllegalStateException();
+                            }
+                        }
+                    }
+                    if (evidenceId == null || !expectedIds.contains(evidenceId) || !seen.add(evidenceId)
+                            || !Set.of(origin.evidenceIds()).equals(seen)
+                            || origin.correlationId() == null || origin.correlationId().isBlank()) {
+                        throw new IllegalStateException();
+                    }
+                    signals.add(new IntroducedSignal(evidenceId, origin.id(), origin.correlationId(), origin.signal()));
+                }
+            }
+        }
+        if (!seen.equals(expectedIds) || signals.size() != target.evidenceIds().length) throw new IllegalStateException();
+        return new CorrelatedRevision(target.id(), target.groupId(), signals.size(), signals, target.scope(),
+                target.incidentId(), target.executionId(), target.summary(), target.correlationId(), target.createdAt());
     }
 
     /** Technical acknowledgement only; an authoritative downstream contract must supply this later. */

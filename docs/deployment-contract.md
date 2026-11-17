@@ -142,11 +142,11 @@ or close PD-010/031/034 as a whole.
 |---|---|---|
 | Grouping, serial revisions and source receipts | **Integrated:** DD-023 and Correlation V2; exact trusted scope + execution/attempt + ORIGIN incident, immutable cumulative membership, original-member receipts and monotonic confirmation. | Real authorization/reference checks and downstream confirmation remain boundary work; do not reselect the grouping or delivery order. |
 | Minimal protected signal | **Integrated:** DD-023 supplement, model PR #16 and Correlation PR #6/V3. Each introducing snapshot freezes stage, protected summary and minimized content; historical reads recover exact membership. | Input protection, explicit payload budgets and transmission of this representation remain to be connected. No source timestamps or templates are added implicitly. |
-| Recommendation receipt | **Approved model:** [DD-024](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-024), Docs model 1.6.0. Operation equals context ID; matching replay is duplicate, conflicting content has no effects, and acceptance follows atomic persistence. | The complete versioned wire contract was not located, and the user has no copy. Reconstruct the missing definition from the recorded agreements and identify only uncovered details before implementing the adapter. This is not a request to reapprove DD-024. |
-| Receipt content versus frozen signals | **Integrated 1.6.0 lacks signals; approved local 1.7.0 adds them:** the typed JSON array and exact-membership constraints now express DD-024's recoverable projection. | Recommendation still needs its own migration/receiver under its owner scope. Source DDL checks do not prove real reception or diagnostic execution. |
-| Structured resource scope | **Approved local persistence implemented:** V4 freezes five typed fields per snapshot and readRevision recovers the original envelope. The group key remains opaque. | The trusted supplier, current authorization/revocation and owner-reference contracts remain open. Stored historical scope is not an authority decision. |
+| Recommendation receipt | **Integrated model and approved local wire mapping:** DD-024/model 1.7.0, operation equals context ID, atomic acceptance and matching duplicate/conflict. The reconstructed OpenAPI mapping/comparison was explicitly adopted by the user. | Recommendation has a local migration and isolated receiver implementation. Operational authority and budgets remain open. The original complete v1 definition was unavailable; the adopted reconstruction remains in force. |
+| Receipt content versus frozen signals | **Integrated 1.7.0 includes signals:** the typed JSON array and exact-membership constraints now express DD-024's recoverable projection. | Recommendation's local V1 and receipt store were exercised with loopback HTTP and disposable PostgreSQL. |
+| Structured resource scope | **Integrated persistence (PR #7):** V4 freezes five typed fields per snapshot and readRevision recovers the original envelope. The group key remains opaque. | The trusted supplier, current authorization/revocation and owner-reference contracts remain open. Stored historical scope is not an authority decision. |
 | Owner references and evidence identity | **Still proposed/open:** PD-031 owner validation queries and Log/Event adoption of the evidence-ID rule have no usable contract in the consulted sources. | Settle owner-backed existence/membership and authorized scope, including late records, before accepting real requests. IDs and isolated fixtures do not establish existence or permission. |
-| Runtime implementation | **Internal foundation only:** Correlation has no NLP receiver or Recommendation adapter; Recommendation has a RAG client but no diagnostic receiver/persistence. | Implement each ready boundary under its agreed contract and owner scope, then verify isolated HTTP/PostgreSQL integration. No deployment is implied. |
+| Runtime implementation | **Isolated Correlation client implemented:** complete projection, canonical codec and strict bounded HTTP with no activation bean. The local application service can deliver and confirm an already prepared revision. NLP reception and orchestration that starts with preparation remain pending. Recommendation has a local, explicitly composed durable receiver. | Settle operating capacity/overflow and current authority/reference contracts before workflow activation. Both adapters passed the isolated lost-response test. |
 
 Consulted clean revisions: Correlation `2d2f7ef`, Docs `60679a9`,
 Recommendation `ffa2dd3`, RAG `822cdf5`, NLP `1d6e54f` and Log/Event `d1f0277`.
@@ -189,14 +189,14 @@ the boundary details open:
 
 | Remaining exact decision | Impact / recommended direction |
 |---|---|
-| What exact wire mapping carries the frozen signals? | Local model 1.7.0 now includes the approved typed receipt array. Match the wire projection and Recommendation migration/receiver to that source; no redesign of Correlation snapshots or second approval of the storage choice is needed. |
+| Exact wire mapping and comparison | **Approved and implemented locally:** the OpenAPI mapping and Java codec use integrated fields and pass cross-language vectors. Recommendation must implement that mapping; do not reapprove the storage or codec choices. |
 | Who supplies verified structured scope, how is it bound/recovered for the same operation, and how is current authorization reevaluated? | Require a verifiable source and recoverable immutable request binding; no defaults or parsing of the opaque key. Reauthorization must not silently replace historical scope/content. |
-| What significant projection, canonical comparison and size/deadline limits apply? | Define one deterministic request codec and explicit budgets before the wire adapter. Do not select a hash projection, storage format or numeric limits by inference. RAG's 4000-character query limit is not the evidence budget. |
+| Which operating size/deadline/retry limits and overflow disposition apply? | The significant projection and restricted comparison are adopted. The isolated adapter requires explicit mechanical bounds without defaults; actual runtime budgets remain unselected. RAG's 4000-character query limit is not the evidence budget. |
 
-Ready work is the documented field/approval reconciliation and isolated fixture
-design. Wire DTO/codec, sender activation, receiver persistence changes and real
-scope/reference acceptance depend only on their respective unresolved agreement
-or owner scope; the whole service is not blocked by an unrelated pending item.
+The projection, codec and isolated HTTP adapter are implemented. Workflow
+activation, receiver persistence and real scope/reference acceptance depend on
+their respective remaining operating/authority agreement or owner scope; the
+whole service is not blocked by an unrelated pending item.
 Acceptance must cover A then A+B with their exact signals and traces, response
 loss after remote commit followed by duplicate, restart recovery of the same
 operation/representation, conflict without effects, and no local confirmation
@@ -758,6 +758,189 @@ retry horizon and safe operational disposition require a separate explicit
 policy; an infinite retry loop is not proposed. No extra broker or polling
 relationship is introduced.
 
+<a id="concrete-http-candidate--2026-11-17"></a>
+
+### HTTP mapping and comparison — approved locally, 2026-11-17
+
+The [candidate OpenAPI](contracts/correlation-recommendation-v1.candidate.json)
+and [synthetic examples](contracts/correlation-recommendation-v1.examples.json)
+make the reconstructed definition reviewable. After reviewing the concrete
+candidate, the user explicitly adopted this mapping and comparison for an
+isolated Java client (“Aprobado, seguimos”). The original complete v1 definition
+remains unavailable; this approval supplies the missing concrete wire choices
+rather than invalidating DD-024. Runtime activation and Recommendation's receiving
+route are not authorized by this increment.
+
+The candidate maps the existing snapshot ID to `operation_id`, its five historical
+scope fields to `authorization_scope`, the original seven snapshot fields to
+`context`, and the exact introducing signal projections to `signals`. It omits
+group ID, a second revision counter, templates and new source timestamps. The
+snapshot's original correlation ID supplies both context and HTTP correlation;
+an alias's individual source trace remains in its source receipt.
+
+Approved wire-only choices include the route/header/receipt mapping, strict
+known-field compatibility, canonical lowercase UUID strings, six-digit UTC
+microsecond snapshot timestamps, an explicitly present nullable pipeline and
+lexically sorted evidence-ID strings. Sorting a wire copy does not mutate the
+stored snapshot membership. Signal order remains incorporation order. Schema
+validation cannot alone prove header equality, operation/context identity,
+exact evidence membership, origin/last-snapshot correspondence or receipt
+correspondence; the checker exercises
+these extra invariants separately.
+
+#### Candidate comparison and recovery
+
+The downstream `request_fingerprint` covers the complete validated typed body,
+including business correlation, historical scope and exact signals. It is
+separate from the source message's stored `input_fingerprint`; those values
+cannot substitute for each other. HTTP authorization and W3C tracing headers are
+excluded. The approved restricted JSON encoding sorts the fixed ASCII property
+names, emits compact UTF-8 without a BOM and preserves string values exactly:
+no trimming, Unicode normalization or repeated sanitization. The candidate
+artifacts define escaping/null handling and reference vectors. Reject duplicate
+JSON keys and invalid Unicode before comparison; equivalent JSON whitespace or
+object-key order does not create a new operation.
+
+A receipt confirms only durable remote reception when version, status and both
+IDs match the sent operation. A different ID/version, empty/malformed body,
+unknown status or `202` does not permit local confirmation. Timeout, connection
+loss and an unreadable success leave the result unknown: retain the same frozen
+operation; a later permitted recovery sends that operation again. A retry does
+not authorize another diagnosis ID or silently rebuild scope from current input.
+No attempt count, backoff or retry horizon is selected by this candidate.
+
+Distinct signal origin IDs and a last origin/trace matching the snapshot follow
+from one introduced member per revision. The checker rejects contradictions in
+these fields, without proving the existence or earlier relative order of origins.
+
+The body is a protected, minimized representation supplied by an authorized
+boundary; string/shape checks do not sanitize it. Current scope/revocation and
+owner-reference verification remain mandatory before exposing data or duplicate
+results. The Bearer scheme does not supply issuer, audience, role or principal
+values. The future client must not automatically follow redirects with its
+credential. Remote error bodies must not become unsafe local logs or responses.
+
+#### Decisions and material failure acceptance
+
+| Decision still needed | Concrete proposal / consequence |
+|---|---|
+| Mapping, strict compatibility, response and comparison encoding | **Approved locally:** use the versioned artifact and conformance vectors. The isolated Java client verifies actual byte/hash conformance; the Python reference check alone is not interoperability evidence. |
+| Which bytes, field/member sizes, response size, total deadline and retry limits are supported? | No values are supported by the consulted producer contracts. Select them explicitly; the artifacts mark them pending rather than supplying runtime defaults. RAG query length and NLP local settings are not this contract's budgets. |
+| What happens when cumulative growth exceeds the selected limits? | Validate the projected operation before preparing a new snapshot. Specify the upstream/operational disposition; do not truncate text, remove members, open another group, introduce windows or split a snapshot. A permanent excess must not become an endless transient retry. |
+| Who verifies current scope, revocation and logical references? | Supply an agreed authority and failure/disposition contract. Historical scope and an authenticated service principal alone do not grant access to all resources. |
+
+| Acceptance case | Required result | Evidence at this stage |
+|---|---|---|
+| A then A+B | Preserve each revision's scope, signals, IDs and incorporation traces; no later member in A. | Synthetic contract shape/invariant checks; persistence covered by the integrated 46-test increment. |
+| Key-order/JSON whitespace changes | Same proposed request fingerprint; text/scope/significant signal changes differ. | Java bytes/hash matched Python vectors; no Recommendation codec exists to establish counterpart compatibility. |
+| Crossed header, IDs, duplicate/missing members or unsafe unknown fields | Reject without confirming a different or partial operation. | Synthetic negative checks plus isolated codec/HTTP client checks. |
+| Wrong/empty/non-JSON receipt or non-final status | No local `confirm()`. | Isolated client rejects these over actual loopback HTTP; no business workflow is activated. |
+| Remote commit followed by lost response; concurrent duplicate; restart | Same operation recovers a valid `duplicate`, with one durable remote acceptance and no false local confirmation. | Future HTTP/PostgreSQL integration; not exercised by the candidate checker. |
+| Revocation, references not yet committed or dependency outage | No unauthorized acceptance, disclosure or fabricated owner records. | Authority/owner contract and future real isolated integration remain required. |
+| Capacity excess and deadline exhaustion | Agreed bounded failure/disposition; unchanged history and no new operation ID. | Numeric policy and overflow decision pending; not exercised. |
+
+The command and actual check results are recorded in [README](../README.md#development-and-verification).
+The earlier document/reference-check stage did not require an application rerun.
+The now-approved isolated client increment runs the complete service suite and
+records its actual results below; it does not implement the business workflow.
+
+#### Isolated client construction and readiness
+
+The client has no Spring bean, listener, automatic delivery task, token-acquisition
+SDK or activation configuration. A caller supplies a current bearer token for
+one invocation; acquiring it and verifying present resource authority are future
+boundary responsibilities. Tokens do not enter stored projections, canonical
+bytes or fingerprints. Errors must not reveal payloads, tokens or remote bodies.
+
+Constructor bounds for request bytes, response bytes and elapsed time must be
+positive and explicit. Their test values do not select runtime policy. No
+implicit retry, redirect following or local `prepare()`/`confirm()` call is
+introduced. The future orchestrator must validate the projected operation's
+agreed capacity before preparation; a bounded client refusal does not settle
+cumulative overflow disposition. A valid returned receipt alone does not activate
+that orchestrator or prove Recommendation's persistence.
+
+The existing query projection is extended instead of adding a near-duplicate DTO.
+Its metadata comes from the immutable target snapshot under the same consistent
+read as scope/signals. Alias traces remain individual source receipts; delivery
+uses the target snapshot's original correlation.
+
+Jackson databind is managed at 3.1.7 by the existing Spring Boot 4.1.2 parent.
+Only the direct JSON dependency is added, without a web server starter, provider
+SDK or new version override. JDK 25's bounded response body handler and HTTP
+client implement transport; the non-web bootstrap and disabled Flyway remain.
+
+#### Isolated client verification
+
+`./mvnw verify` passed 61 checks on Java 25 with PostgreSQL 17.11 and a loopback
+HTTP fixture: 46 existing domain/persistence checks, four canonical codec checks
+and eleven HTTP checks. The coordinator inspected eight Surefire XML reports,
+`BUILD SUCCESS`, and the packaged Jackson core/databind 3.1.7 libraries. The
+Python mapping checker passed; V1–V4 bytes remain unchanged.
+
+The HTTP fixture demonstrates actual request headers/body, strict accepted and
+duplicate receipts, safe malformed/UTF-8/duplicate-key/trailing/unknown-field
+rejection, response/request caps, redirects not followed, no hidden application
+retry, delayed headers/body deadline handling and manual replay of identical
+bytes after a lost response. It does not implement a database receipt or prove
+remote durable commit. The persistence test separately confirms no delivery bean
+is registered and that original snapshot metadata survives alias/revision reads.
+
+Independent review found and closed a classification gap: a definitive rejection
+with a huge/stalled error body must not turn into an unknown result merely while
+waiting to buffer that body. The body handler now classifies status first and
+propagates only a fresh safe failure kind. Tests cover 401/403/409 oversized and
+stalled responses. Malformed success still means unknown reception. No material
+findings remained in the final independent review.
+
+No real token acquisition, scope authority, upstream reference validation,
+Recommendation process/database, environment HTTP/TLS or deployment was tested.
+No store confirmation or preparation workflow was introduced by the client.
+
+#### Durable receiver and two-adapter verification — 2026-11-17
+
+The Recommendation checkout has a local V1 for the DD-024 receipt, a strict JSON
+decoder and an internal route factory requiring an explicit data source, byte
+cap and authority implementation. It authorizes each submission before looking
+for duplicates; the database transaction commits the snapshot, scope, signals
+and fingerprint before replying. The default application composition leaves
+the route inactive.
+
+Recommendation's `./mvnw -B verify` passed 14 tests. In a separate local cross-repo
+harness, the actual Correlation client sent the approved A+B fixture through an
+HTTP proxy to the Recommendation route and PostgreSQL 17.11. The proxy discarded
+the first response after observing `accepted`. A new client instance resent
+identical bytes, and the committed operation returned `duplicate`. The harness
+passed using synthetic authority and explicit fixture bounds. It did not exercise
+environment credentials, actual resource authority, or the NLP workflow.
+
+For the capacity decision, compare the encoded UTF-8 operation against the
+agreed budget before writing a new unconfirmed snapshot. The reference bodies
+measure 937 and 1,222 bytes and are synthetic examples, so size them against
+representative cumulative evidence and the eventual ingress limits before
+choosing an operating ceiling. Proposed disposition for a permanently oversized
+new revision is an explicit rejection before persistence, with review through
+the existing NLP permanent-rejection path if its inbound contract adopts it.
+NLP already treats generic 4xx responses as permanent; forwarding this behavior
+from Correlation still needs agreement, including recovery when receiver capacity
+changes. Real authority, deployment, numeric budgets and reauthorization behavior
+remain pending.
+
+#### Local confirmation after durable receipt
+
+For an already prepared revision, the internal application service sends the
+frozen projection through the approved delivery port. It calls persistence
+confirmation only after checking the receipt status and both IDs. Failed
+delivery or mismatched receipt leaves the revision pending. If local confirmation
+fails after remote acceptance, the caller can replay the same immutable
+operation and use the remote duplicate receipt. Concurrent replays rely on
+the existing downstream idempotency and monotonic local confirmation.
+
+The caller must establish current authorization for the exact revision and
+supply the access token. This service takes a prepared projection and makes
+one attempt. It has no listener or activation configuration. It does not
+choose which new contribution to prepare or set retry or capacity policy.
+
 ### Correlation → Recommendation proposal
 
 The original 11/11 candidate proposed `POST /internal/v1/correlated-contexts`,
@@ -776,8 +959,8 @@ Correlation may confirm local delivery only after a valid remote receipt.
 
 The seven-field candidate is not the full current Correlation representation:
 DD-023/V3 also freezes stage, protected summary and minimized content per
-evidence. The new receipt model has no equivalent signal representation, so
-complete the missing wire definition and reconcile this difference before implementing
+evidence. Integrated model 1.7.0 now has the equivalent typed receipt signal representation.
+Complete the missing wire definition and its acceptance decisions before implementing
 the handoff. Do not treat source timestamps or templates as newly approved fields.
 The trusted scope supplier/encoding and recoverability must also be explicit;
 a tenant in a body or an opaque scope key is not authorization evidence.
@@ -788,6 +971,25 @@ a second delivery. Receipt storage/transaction and the receiver belong to
 Recommendation. A receipt is not completed diagnosis, and no evidence-fetch API
 or background processing guarantee is inferred. See the
 [current state](#current-reconciliation-state--2026-11-16) for remaining work.
+
+### Remaining work for NLP intake and activation
+
+| Work | Proposed resolution and acceptance |
+|---|---|
+| Current machine scope and PD-031 | Use Ingestion's existing machine authority as the source for current capture permission, through an agreed machine operation on the Pipeline–Ingestion relationship. Pipeline validates committed pipeline, execution/attempt and ORIGIN incident membership. Log/Event validates committed evidence against that same authorized scope and execution/incident. Both validations must be bound to the incoming request. Confirm the architecture additions and agree how Log/Event verifies the scope before either owner exposes a validation operation. |
+| Missing or denied references | Distinguish authorized but not yet visible, unavailable authority, contradiction and denial. Treat absence as retryable within an agreed horizon. Contradictions are permanent after authorization. Denials reveal no existence information. Rejected attempts create no snapshot or downstream delivery. The historical scope stays frozen when a replay is reauthorized. |
+| Cumulative request capacity | Use the approved canonical UTF-8 encoder on the exact new revision inside the preparation transaction. A capacity failure must roll back the provisional writes, preserving the prior confirmed revision. Recover an existing operation with its original representation. Propose a terminal 413 for a new revision beyond the agreed ceiling. NLP already settles generic permanent 4xx by moving the message to its existing dead-letter path; agree the reason and operator disposition under PD-034 before mapping it. A pending revision made too large by a configuration change needs explicit recovery, with its original data preserved. |
+| Deadline and retries | Set one Correlation processing deadline capped by the caller's attempt budget and current credential validity. Allocate remaining time across request reading, authority and owner queries, database preparation, delivery and confirmation. Include a read deadline at the receiver as well as a byte cap. Reuse scoped NLP redelivery for unknown delivery outcomes and preserve the operation ID. Agree numeric caps, attempt/deadline budgets and exhaustion handling from representative sanitized inputs and owner measurements before activation. |
+| NLP receiver and confirmation | Use NLP's existing emitted v2 body as the contract candidate. Agree the exact compatibility, stable protected-input comparison, errors and handling of optional fields. Verify it with the real NLP serializer and exact source timestamps, then compose authorization, reference validation, bounded preparation and matching-receipt confirmation. Return NLP success only after local confirmation; an already confirmed replay also needs reauthorization. |
+
+Current owner evidence: Pipeline `84f7ac0` has execution and incident lookups and
+dashboard-facing reads; these do not implement the machine validation contract.
+Log/Event `d1f0277` remains documentation-only and must implement evidence
+persistence and adopt its identifier rule. Ingestion `1066785` has local
+current-scope verification and needs an agreed cross-service machine operation.
+NLP `1d6e54f` handles generic 4xx as permanent, 401/403 as authorization
+failures, and 429/5xx as retryable. The 937- and 1,222-byte wire fixtures
+check compatibility and cannot establish production capacity.
 
 ### PD-031 decision proposal: owner-verified references
 
@@ -1064,7 +1266,7 @@ approval rule is unspecified.
 | Scoped message identity and durable state | **Integrated:** DD-023/V2 group and receipts, V3 minimal signals; the physical representation and serial order are settled. The real significant-input codec and receipt lifecycle remain open; do not redesign the tables to resolve them. | Existing user approvals and integrated model. PD-034/035 apply only to remaining codec, budgets and lifecycle; local Docs edits were separately authorized. |
 | How can Correlation verify authorized tenant/repository/run/attempt/incident/evidence membership, including not-yet-arrived data? | The [PD-031 proposal](#pd-031-decision-proposal-owner-verified-references) recommends owner validation queries after explicit architectural approval: the current graph cannot carry post-commit owner confirmations. Propose retryable unavailability for late/unknown references, without a new pending queue. Scope/provenance sources still require agreement. | PD-031 Jhon/Ramiro for contract; architecture authority must be identified for the new relationships. Pipeline and Log/Event own their implementations. No usable validation contract exists today. |
 | Does Log/Event accept the UUIDv5 evidence-ID rule already computed by NLP? | Adopt the proposed rule or agree an owner-issued identity through the declared exchange. Recommend confirming the compatible rule with Log/Event; no ID changes here. | Log/Event owner, PD-031/032/033; no owner approval found. |
-| Where is the complete approved Recommendation v1 definition, and how are its signals and structured scope recovered? | **Approval recorded in DD-024:** operation identity, atomic receipt and duplicate/conflict invariants. No complete source was found and the user has no copy; complete only the missing signal representation, scope binding, codec and limits. Recommend a self-contained recoverable revision; do not infer a new fetch relationship or repeat approval of settled invariants. | PD-010/034 authorities with Recommendation owner. Blocks dependent wire adapter/receiver work, not documentation reconciliation. |
+| Reconstructed Recommendation wire mapping and comparison | **Adopted and implemented in the isolated client:** the OpenAPI, frozen fields and Java/Python vectors now define the previously missing concrete mapping. Do not reapprove grouping, storage, operation identity or the adopted codec. | PD-010/034 remaining work is Recommendation receiver/migration and proof of durable receipt; runtime authority, budgets and overflow disposition are separate pending inputs. |
 | Correlation unit, revision order and closure | **Integrated:** exact scope + execution/attempt + ORIGIN grouping, each new verified evidence grows an immutable cumulative set, and preparation waits for prior confirmation. No completeness or closure claim. | Existing user approvals and DD-023; do not reopen. They do not approve unrelated receiver/security contracts. |
 | What issuer/audiences/roles and trusted resource-scope evidence, payload limits and timeout/retry horizons apply? | Agree explicit fail-closed values versus keep integration disabled. Recommend explicit values before enabling REST; no permissive defaults. | PD-034/035 Jhon/Ramiro with security/backend/IaC owners; not settled by Entra as a technology choice. |
 

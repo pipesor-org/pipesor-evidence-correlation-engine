@@ -48,6 +48,7 @@ class CorrelatedContextPersistenceTest {
                         "--spring.datasource.password=" + POSTGRES.getPassword());
         entityManagers = context.getBean(EntityManagerFactory.class);
         assertThat(context.getBeansOfType(Flyway.class)).isEmpty();
+        assertThat(context.getBeansOfType(org.pipesor.correlation.context.application.ports.RecommendationDelivery.class)).isEmpty();
         assertThat(context.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto")).isEqualTo("validate");
     }
 
