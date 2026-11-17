@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Immutable;
 import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
+import org.pipesor.correlation.context.domain.model.valueobjects.ScopeEnvelope;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -37,11 +38,22 @@ class CorrelatedContextEntity {
     @Column(name = "signal_content", nullable = false, columnDefinition = "text")
     private String signalContent;
 
+    @Column(name = "scope_tenant_id", nullable = false)
+    private UUID scopeTenantId;
+    @Column(name = "scope_github_installation_id", nullable = false, columnDefinition = "text")
+    private String scopeInstallationId;
+    @Column(name = "scope_github_repository_id", nullable = false, columnDefinition = "text")
+    private String scopeRepositoryId;
+    @Column(name = "scope_pipeline_id")
+    private UUID scopePipelineId;
+    @Column(name = "scope_revision", nullable = false, columnDefinition = "text")
+    private String scopeRevision;
+
     protected CorrelatedContextEntity() {
     }
 
     CorrelatedContextEntity(UUID id, UUID incidentId, UUID executionId, UUID[] evidenceIds,
-                            String summary, String correlationId, Instant createdAt, UUID groupId, EvidenceSignal signal) {
+                            String summary, String correlationId, Instant createdAt, UUID groupId, EvidenceSignal signal, ScopeEnvelope scope) {
         this.id = id;
         this.incidentId = incidentId;
         this.executionId = executionId;
@@ -53,6 +65,11 @@ class CorrelatedContextEntity {
         this.signalStage = signal.stage();
         this.signalSummary = signal.summary();
         this.signalContent = signal.content();
+        this.scopeTenantId = scope.tenantId();
+        this.scopeInstallationId = scope.installationId();
+        this.scopeRepositoryId = scope.repositoryId();
+        this.scopePipelineId = scope.pipelineId();
+        this.scopeRevision = scope.revision();
     }
 
     UUID id() { return id; }
@@ -64,4 +81,5 @@ class CorrelatedContextEntity {
     Instant createdAt() { return createdAt; }
     UUID groupId() { return groupId; }
     EvidenceSignal signal() { return new EvidenceSignal(signalStage, signalSummary, signalContent); }
+    ScopeEnvelope scope() { return new ScopeEnvelope(scopeTenantId, scopeInstallationId, scopeRepositoryId, scopePipelineId, scopeRevision); }
 }
