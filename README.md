@@ -99,8 +99,9 @@ business startup command yet. The mapping is package-private infrastructure, not
 an authorized input/write API or sanitizer. The store is package-private and is
 not registered as a business bean or listener. Callers must authenticate scope
 and producer, validate owner references/ORIGIN membership and sanitize summaries.
-Store tests use synthetic metadata and supplied NLP input fingerprints; the real
-source-input comparator remains unimplemented. The separate outgoing request
+The [isolated NLP v2 decoder](docs/deployment-contract.md#local-v2-validation-and-input-fingerprint)
+compares significant protected input using the producer's captured fixtures.
+The separate outgoing request
 codec is implemented and checked against reference vectors. Local technical
 confirmation is not evidence of Recommendation reception. Tenant authorization,
 foreign-reference existence, business timestamp nanosecond preservation, real
