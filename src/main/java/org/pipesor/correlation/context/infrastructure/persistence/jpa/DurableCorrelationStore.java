@@ -51,21 +51,83 @@ final class DurableCorrelationStore {
 
     record Prepared(CorrelatedContextEntity snapshot, int revision, boolean confirmed) { }
 
+    record MemberReference(UUID evidenceId, ScopeEnvelope scope) {
+        MemberReference {
+            Objects.requireNonNull(evidenceId, "Evidence reference is required");
+            Objects.requireNonNull(scope, "Evidence scope is required");
+        }
+    }
+
+    /** Resolve only the immutable members that the requested operation will expose. No authority I/O occurs here. */
+    Set<MemberReference> membersForPreparation(Contribution input) {
+        try (var connection = dataSource.getConnection()) {
+            connection.setReadOnly(true);
+            connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            connection.setAutoCommit(false);
+            try {
+                var replay = receipt(connection, input);
+                CorrelatedContextEntity target = replay == null ? null : replay.snapshot();
+                boolean addition = false;
+                if (target == null) {
+                    try (var statement = connection.prepareStatement("""
+                            SELECT id FROM evidence.correlation_groups
+                            WHERE scope_key = ? AND execution_id = ? AND incident_id = ?
+                            """)) {
+                        bind(statement, input.context().scope(), input.context().executionId(), input.context().incidentId());
+                        try (var rows = statement.executeQuery()) {
+                            if (rows.next()) {
+                                UUID group = rows.getObject("id", UUID.class);
+                                target = originalMember(connection, group, input.evidenceId());
+                                if (target == null) {
+                                    target = latest(connection, group);
+                                    addition = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                var members = new HashSet<MemberReference>();
+                if (target != null) {
+                    if (!target.scope().sameResource(input.scope())) {
+                        throw new IllegalArgumentException("Correlation group conflicts with its resource scope");
+                    }
+                    readRevision(connection, input.context(), target.id(), members::add);
+                }
+                if (target == null || addition) members.add(new MemberReference(input.evidenceId(), input.scope()));
+                connection.commit();
+                return Set.copyOf(members);
+            } catch (SQLException | RuntimeException failure) {
+                connection.rollback();
+                if (failure instanceof IllegalArgumentException conflict) throw conflict;
+                throw new IllegalStateException("Correlation member references are unavailable");
+            }
+        } catch (SQLException unavailable) {
+            throw new IllegalStateException("Correlation member references are unavailable");
+        }
+    }
+
     Prepared prepare(Contribution input) {
-        return prepareInternal(input, null);
+        return prepareInternal(input, null, null);
     }
 
     /** Pure local capacity check only; it runs before commit and never for an existing operation. */
     Prepared prepare(Contribution input, Consumer<CorrelatedRevision> capacity) {
-        return prepareInternal(input, Objects.requireNonNull(capacity, "Capacity check is required"));
+        return prepareInternal(input, Objects.requireNonNull(capacity, "Capacity check is required"), null);
     }
 
-    private Prepared prepareInternal(Contribution input, Consumer<CorrelatedRevision> capacity) {
+    /** Authority checks finish before SQL. Exact membership is compared again in the preparation transaction. */
+    Prepared prepare(Contribution input, Consumer<CorrelatedRevision> capacity, Set<MemberReference> verifiedMembers) {
+        return prepareInternal(input, Objects.requireNonNull(capacity, "Capacity check is required"),
+                Set.copyOf(Objects.requireNonNull(verifiedMembers, "Verified members are required")));
+    }
+
+    private Prepared prepareInternal(Contribution input, Consumer<CorrelatedRevision> capacity, Set<MemberReference> verifiedMembers) {
         try (var connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
                 var replay = receipt(connection, input);
                 if (replay != null) {
+                    verifyMembers(connection, input.context(), replay.snapshot().id(), verifiedMembers);
                     connection.commit();
                     return replay;
                 }
@@ -92,6 +154,7 @@ final class DurableCorrelationStore {
                 }
                 replay = receipt(connection, input);
                 if (replay != null) {
+                    verifyMembers(connection, input.context(), replay.snapshot().id(), verifiedMembers);
                     connection.commit();
                     return replay;
                 }
@@ -134,10 +197,12 @@ final class DurableCorrelationStore {
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """, input.context().scope(), input.producerKey(), input.messageId(), input.evidenceId(),
                         input.correlationId(), snapshot.id(), input.inputFingerprint(), now);
+                var verifiedRevision = verifyMembers(connection, input.context(), snapshot.id(), verifiedMembers);
                 if (newSnapshot && capacity != null) {
                     CorrelatedRevision candidate;
                     try {
-                        candidate = readRevision(connection, input.context(), snapshot.id());
+                        candidate = verifiedRevision == null
+                                ? readRevision(connection, input.context(), snapshot.id()) : verifiedRevision;
                     } catch (RuntimeException unavailable) {
                         throw new IllegalStateException("Correlation revision is unavailable");
                     }
@@ -150,9 +215,15 @@ final class DurableCorrelationStore {
                 connection.rollback();
                 if ("23505".equals(failure.getSQLState())) {
                     // Only a scoped message-key race may recover; no generic transaction retry.
-                    var replay = receipt(connection, input);
-                    connection.rollback();
-                    if (replay != null) return replay;
+                    try {
+                        var replay = receipt(connection, input);
+                        if (replay != null) {
+                            verifyMembers(connection, input.context(), replay.snapshot().id(), verifiedMembers);
+                            return replay;
+                        }
+                    } finally {
+                        connection.rollback();
+                    }
                 }
                 throw new IllegalStateException("Correlation preparation could not be persisted");
             } catch (RuntimeException failure) {
@@ -185,8 +256,24 @@ final class DurableCorrelationStore {
         }
     }
 
+    private static CorrelatedRevision verifyMembers(Connection connection, Context expectedContext, UUID contextId,
+            Set<MemberReference> verifiedMembers) throws SQLException {
+        if (verifiedMembers == null) return null;
+        var actual = new HashSet<MemberReference>();
+        var revision = readRevision(connection, expectedContext, contextId, actual::add);
+        if (!actual.equals(verifiedMembers)) {
+            throw new IllegalStateException("Correlation membership changed during verification");
+        }
+        return revision;
+    }
+
     private static CorrelatedRevision readRevision(Connection connection, Context expectedContext, UUID contextId)
             throws SQLException {
+        return readRevision(connection, expectedContext, contextId, null);
+    }
+
+    private static CorrelatedRevision readRevision(Connection connection, Context expectedContext, UUID contextId,
+            Consumer<MemberReference> members) throws SQLException {
         CorrelatedContextEntity target;
         try (var statement = connection.prepareStatement("""
                 SELECT c.* FROM evidence.correlated_contexts c
@@ -240,6 +327,7 @@ final class DurableCorrelationStore {
                         throw new IllegalStateException();
                     }
                     signals.add(new IntroducedSignal(evidenceId, origin.id(), origin.correlationId(), origin.signal()));
+                    if (members != null) members.accept(new MemberReference(evidenceId, origin.scope()));
                 }
             }
         }

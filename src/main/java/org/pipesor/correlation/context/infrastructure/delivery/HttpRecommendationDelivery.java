@@ -49,6 +49,18 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
 
     @Override
     public Receipt deliver(CorrelatedRevision revision, String accessToken) {
+        return deliverWithin(revision, accessToken, timeoutNanos);
+    }
+
+    /** The caller may shorten, but never extend, the configured delivery budget. */
+    public Receipt deliver(CorrelatedRevision revision, String accessToken, Duration remainingBudget) {
+        if (remainingBudget == null || remainingBudget.isZero() || remainingBudget.isNegative()) throw unknown();
+        long limit = remainingBudget.compareTo(Duration.ofNanos(timeoutNanos)) < 0
+                ? remainingBudget.toNanos() : timeoutNanos;
+        return deliverWithin(revision, accessToken, limit);
+    }
+
+    private Receipt deliverWithin(CorrelatedRevision revision, String accessToken, long limit) {
         long started = System.nanoTime();
         if (accessToken == null || accessToken.isEmpty() || accessToken.chars().anyMatch(c -> c <= 0x20 || c >= 0x7f)) {
             throw new IllegalArgumentException("A current bearer token is required");
@@ -57,7 +69,7 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
         try {
             byte[] body = RecommendationJson.encode(revision, maxRequestBytes);
             var request = HttpRequest.newBuilder(destination)
-                    .timeout(Duration.ofNanos(remaining(started)))
+                    .timeout(Duration.ofNanos(remaining(started, limit)))
                     .header("Content-Type", "application/json; charset=utf-8")
                     .header("Accept", "application/json")
                     .header("Authorization", "Bearer " + accessToken)
@@ -68,8 +80,8 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
                 if (responseInfo.statusCode() != 200) throw rejected(responseInfo.statusCode());
                 return HttpResponse.BodySubscribers.limiting(HttpResponse.BodySubscribers.ofByteArray(), maxResponseBytes);
             });
-            var response = pending.get(remaining(started), TimeUnit.NANOSECONDS);
-            remaining(started);
+            var response = pending.get(remaining(started, limit), TimeUnit.NANOSECONDS);
+            remaining(started, limit);
             if (!jsonContentType(response.headers().firstValue("Content-Type").orElse(""))) throw unknown();
             Receipt receipt;
             try {
@@ -77,7 +89,7 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
             } catch (IllegalArgumentException invalidReceipt) {
                 throw unknown();
             }
-            remaining(started);
+            remaining(started, limit);
             return receipt;
         } catch (RecommendationJson.RequestTooLarge failure) {
             throw new Failure(Failure.Kind.TOO_LARGE);
@@ -100,8 +112,8 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
         }
     }
 
-    private long remaining(long started) {
-        long remaining = timeoutNanos - (System.nanoTime() - started);
+    private static long remaining(long started, long limit) {
+        long remaining = limit - (System.nanoTime() - started);
         if (remaining <= 0) throw unknown();
         return remaining;
     }

@@ -10,10 +10,11 @@ signal once; an internal read reconstructs the exact signals of an older revisio
 The approved scope increment also freezes each snapshot's historical tenant,
 installation, repository, optional pipeline and scope revision. This stored
 envelope does not establish current authorization.
-It includes a manually constructed Recommendation client with strict receipt
-validation and bounded HTTP; no NLP receiver or authorized delivery workflow is
-activated. The business boundary and handoff still require the
-[contract decisions](docs/deployment-contract.md#local-contract-proposal-for-decision).
+The [explicit NLP receiver composition](docs/deployment-contract.md#local-signed-nlp-receiver)
+binds a configured workload and capture scope, checks both owners before
+preparation, and confirms Recommendation's receipt before returning success.
+The default startup stays non-web. Environment identities, budgets, and the
+remaining response and broker policies are activation inputs.
 No container image or release automation is introduced.
 
 ## Documentation

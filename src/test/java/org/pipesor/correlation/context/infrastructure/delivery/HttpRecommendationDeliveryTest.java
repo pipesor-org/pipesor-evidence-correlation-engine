@@ -83,6 +83,23 @@ class HttpRecommendationDeliveryTest {
     }
 
     @Test
+    void aShorterCallerBudgetStopsWaitingForTheReceipt() throws Exception {
+        var fixture = DeliveryFixtures.vectors().get(0);
+        byte[] accepted = DeliveryFixtures.JSON.writeValueAsBytes(fixture.get("accepted_receipt"));
+        try (var server = new Stub((exchange, number) -> {
+            if (number > 1) Thread.sleep(900);
+            reply(exchange, 200, "application/json", accepted);
+        }); var client = server.client(20_000, 2_000, Duration.ofSeconds(3))) {
+            var revision = DeliveryFixtures.revision(fixture);
+            assertThat(client.deliver(revision, TOKEN).status()).isEqualTo(Status.ACCEPTED);
+            var failure = assertThrows(Failure.class,
+                    () -> client.deliver(revision, TOKEN, Duration.ofMillis(300)));
+            assertThat(failure.kind()).isEqualTo(Failure.Kind.UNKNOWN);
+            assertThat(server.calls.get()).isEqualTo(2);
+        }
+    }
+
+    @Test
     void classifiesRejectionsAndTransientResponsesWithoutAutomaticRetry() throws Exception {
         var fixture = DeliveryFixtures.vectors().get(0);
         int[] statuses = {400, 401, 403, 409, 413, 429, 503, 404};

@@ -51,6 +51,25 @@ class FrozenSignalsTest {
     static void stopDatabase() { POSTGRES.stop(); }
 
     @Test
+    void guardedPreparationRollsBackWhenAnotherAuthorizedMemberCommitsAfterPreflight() throws Exception {
+        var context = context();
+        var first = store.prepare(input(context, "BUILD"));
+        store.confirm(first.snapshot().groupId(), first.snapshot().id());
+        var inFlight = input(context, "TESTING");
+        var verified = store.membersForPreparation(inFlight);
+        var concurrent = store.prepare(input(context, "DEPLOYMENT"));
+        store.confirm(concurrent.snapshot().groupId(), concurrent.snapshot().id());
+        var before = counts(dataSource);
+
+        var rejected = assertThrows(IllegalStateException.class,
+                () -> store.prepare(inFlight, new RecommendationCapacity(20_000), verified));
+        assertThat(rejected.getMessage()).isEqualTo("Correlation membership changed during verification");
+        assertThat(counts(dataSource)).isEqualTo(before);
+        var retry = store.prepare(inFlight, new RecommendationCapacity(20_000), store.membersForPreparation(inFlight));
+        assertThat(retry.revision()).isEqualTo(3);
+    }
+
+    @Test
     void protectedSignalChangesConflictEvenWithTheSameFingerprintAcrossMessageAndProducerKeys() throws SQLException {
         var input = input(context(), "BUILD");
         var first = store.prepare(input);

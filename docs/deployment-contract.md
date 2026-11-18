@@ -633,7 +633,7 @@ and body version are distinct. See the exact candidate body in
 [NLP integration contracts §3](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/docs/integration-contracts.md#3-correlation-handoff)
 and its serializer in
 [correlation_http.py](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/src/pipesor_nlp_log_processor/infrastructure/correlation_http.py).
-There is no Correlation receiver yet.
+The [local signed receiver](#local-signed-nlp-receiver) supports this shape through explicit composition.
 
 | Surface | Producer behavior / proposed receiver requirement |
 |---|---|
@@ -1014,6 +1014,58 @@ a second delivery. Receipt storage/transaction and the receiver belong to
 Recommendation. A receipt is not completed diagnosis, and no evidence-fetch API
 or background processing guarantee is inferred. See the
 [current state](#current-reconciliation-state--2026-11-16) for remaining work.
+
+### Local signed NLP receiver
+
+`ProcessedEvidenceHttpHandler` composes the existing
+`POST /internal/v1/processed-evidence` candidate with an explicit request byte
+limit, total attempt budget, header limits and admission bound. It verifies a
+signed Entra v2 app-only token for the configured issuer, directory, audience,
+client, principal and application role. Trusted caller configuration supplies
+the stable producer and scope keys and the permitted capture tenant, account,
+installation, repository and workflow. Payload values are matched against that
+configuration before either owner read. Rotating a token does not change the
+configured keys. Choose and preserve these bindings before composing the route.
+
+`ReceiveProcessedEvidence` takes the validated decoder output and the trusted
+caller. Supply the existing owner client and its recipient-specific token source,
+the owned DataSource, the approved Recommendation projection capacity, and the
+bounded Recommendation delivery method with a separate recipient token source.
+It checks both owners for the incoming evidence, then revalidates every
+retained member against its original capture revision before preparing or
+resuming the operation, including on a confirmed replay. Owner I/O finishes
+before the preparation transaction. Preparation compares the verified set to
+the actual members and rolls back when a concurrent contribution changes it.
+The input's protected summary supplies the introducing
+snapshot summary. The existing protected signal and receipt fingerprint freeze
+the rest of that contribution. Preparation rejects overflow before committing
+a new revision.
+
+For a pending operation, deliver the original frozen revision and compare
+the durable receipt against the same operation ID. Confirm the revision in
+PostgreSQL and only then reply with `accepted` and the original `message_id`.
+For an authorized replay of an already confirmed revision, return `duplicate`
+without delivering it again. If an owner is unavailable or late, the receiver
+returns `503` before preparation. Ambiguous Recommendation or local confirmation
+results also return `503`. A durable pending operation can be recovered on NLP's
+next delivery. Recommendation's wait is bounded by the remaining attempt time
+and its recipient token window. Time spent reading and decoding the request
+reduces the remaining attempt budget.
+
+Caller rejection is separate from denial of an individual resource. The
+receiver requires an explicit non-success disposition for resource denial and
+new-revision capacity overflow. These choices have no runtime defaults, and
+the fixture's selected statuses are local examples. The inbound byte limit is
+a separate request-shape limit. Endpoint, identities, capacities and timeout
+values require trusted environment composition. The default Spring startup
+does not register or expose a receiver. Broker redelivery and DLQ policy stay
+under PD-033.
+
+The full build passed 87 tests. A local signed HTTP request exercised the
+receiver and PostgreSQL 17.11 with simulated owner and Recommendation
+responses. Tests cover a late reference, a crossed and then matching receipt,
+confirmed replay, a revoked earlier member, a concurrent change to the
+verified set, and expiration during upload or downstream confirmation.
 
 ### Remaining work for NLP intake and activation
 
