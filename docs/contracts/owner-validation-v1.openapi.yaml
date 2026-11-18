@@ -1,0 +1,480 @@
+openapi: 3.1.0
+info:
+  title: Pipesor internal evidence owner validation
+  version: 1.0.0
+  description: Locally approved contract for PD-031 and PD-034. Each operation is hosted by its indicated data
+    owner on a separately configured internal HTTPS origin.
+paths:
+  /internal/v1/evidence/operational-reference-checks:
+    post:
+      operationId: checkOperationalReferences
+      tags:
+      - Pipeline
+      summary: Check current permission and committed automatic ORIGIN membership
+      security:
+      - workloadBearer: []
+      parameters:
+      - in: header
+        name: X-Correlation-Id
+        required: true
+        schema:
+          $ref: '#/components/schemas/SafeId'
+        description: Must exactly equal the body correlationId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OperationalReferenceRequest'
+      responses:
+        '200':
+          description: Bound business decision. Only AUTHORIZED is a positive result.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalReferenceDecision'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CallerDenied'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedType'
+        '429':
+          $ref: '#/components/responses/Overloaded'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /internal/v1/capture/machine-scope-checks:
+    post:
+      operationId: checkCaptureMachineScope
+      tags:
+      - Ingestion
+      summary: Check current machine permission for an exact protected evidence capture revision
+      security:
+      - workloadBearer: []
+      parameters:
+      - in: header
+        name: X-Correlation-Id
+        required: true
+        schema:
+          $ref: '#/components/schemas/SafeId'
+        description: Must exactly equal the body correlationId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MachineScopeRequest'
+      responses:
+        '200':
+          description: Bound business decision. Only AUTHORIZED is a positive result.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MachineScopeDecision'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CallerDenied'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedType'
+        '429':
+          $ref: '#/components/responses/Overloaded'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  securitySchemes:
+    workloadBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: App-only Microsoft Entra access token with this API as audience and the reviewed caller
+        and operation permission.
+  schemas:
+    CanonicalUuid:
+      type: string
+      format: uuid
+      pattern: ^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$
+    SafeId:
+      type: string
+      pattern: ^[A-Za-z0-9._:-]{1,128}$
+    GithubId:
+      type: string
+      pattern: ^[1-9][0-9]*$
+    OperationalReferenceRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - correlationId
+      - deadlineAt
+      - tenantId
+      - githubAccountId
+      - githubInstallationId
+      - githubRepositoryId
+      - githubWorkflowId
+      - scopeRevision
+      - githubRunId
+      - runAttempt
+      - pipelineId
+      - executionId
+      - incidentId
+      properties:
+        requestId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        correlationId:
+          $ref: '#/components/schemas/SafeId'
+        deadlineAt:
+          type: string
+          format: date-time
+          pattern: Z$
+        tenantId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        githubAccountId:
+          $ref: '#/components/schemas/GithubId'
+        githubInstallationId:
+          $ref: '#/components/schemas/GithubId'
+        githubRepositoryId:
+          $ref: '#/components/schemas/GithubId'
+        githubWorkflowId:
+          $ref: '#/components/schemas/GithubId'
+        scopeRevision:
+          $ref: '#/components/schemas/SafeId'
+        githubRunId:
+          $ref: '#/components/schemas/GithubId'
+        runAttempt:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        pipelineId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        executionId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        incidentId:
+          $ref: '#/components/schemas/CanonicalUuid'
+    MachineScopeRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - correlationId
+      - deadlineAt
+      - tenantId
+      - githubAccountId
+      - githubInstallationId
+      - githubRepositoryId
+      - githubWorkflowId
+      - scopeRevision
+      properties:
+        requestId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        correlationId:
+          $ref: '#/components/schemas/SafeId'
+        deadlineAt:
+          type: string
+          format: date-time
+          pattern: Z$
+        tenantId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        githubAccountId:
+          $ref: '#/components/schemas/GithubId'
+        githubInstallationId:
+          $ref: '#/components/schemas/GithubId'
+        githubRepositoryId:
+          $ref: '#/components/schemas/GithubId'
+        githubWorkflowId:
+          $ref: '#/components/schemas/GithubId'
+        scopeRevision:
+          $ref: '#/components/schemas/SafeId'
+    OperationalReferenceDecision:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - correlationId
+      - decision
+      properties:
+        requestId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        correlationId:
+          $ref: '#/components/schemas/SafeId'
+        decision:
+          type: string
+          enum:
+          - AUTHORIZED
+          - DENIED
+          - NOT_READY
+          - MISMATCH
+    MachineScopeDecision:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - correlationId
+      - decision
+      properties:
+        requestId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        correlationId:
+          $ref: '#/components/schemas/SafeId'
+        decision:
+          type: string
+          enum:
+          - AUTHORIZED
+          - DENIED
+    InvalidRequestProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Bad Request
+        status:
+          type: integer
+          const: 400
+        code:
+          type: string
+          const: INVALID_REQUEST
+    UnauthenticatedProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Unauthorized
+        status:
+          type: integer
+          const: 401
+        code:
+          type: string
+          const: UNAUTHENTICATED
+    CallerDeniedProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Forbidden
+        status:
+          type: integer
+          const: 403
+        code:
+          type: string
+          const: CALLER_DENIED
+    TooLargeProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Content Too Large
+        status:
+          type: integer
+          const: 413
+        code:
+          type: string
+          const: REQUEST_TOO_LARGE
+    UnsupportedTypeProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Unsupported Media Type
+        status:
+          type: integer
+          const: 415
+        code:
+          type: string
+          const: UNSUPPORTED_MEDIA_TYPE
+    OverloadedProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Too Many Requests
+        status:
+          type: integer
+          const: 429
+        code:
+          type: string
+          const: OVERLOADED
+    UnavailableProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+          const: about:blank
+        title:
+          type: string
+          const: Service Unavailable
+        status:
+          type: integer
+          const: 503
+        code:
+          type: string
+          const: UNAVAILABLE
+  responses:
+    InvalidRequest:
+      description: Invalid request
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/InvalidRequestProblem'
+    Unauthenticated:
+      description: Authentication required
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+        WWW-Authenticate:
+          required: true
+          schema:
+            type: string
+            const: Bearer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/UnauthenticatedProblem'
+    CallerDenied:
+      description: Caller not authorized for this operation
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/CallerDeniedProblem'
+    TooLarge:
+      description: Request too large
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/TooLargeProblem'
+    UnsupportedType:
+      description: Unsupported media type
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/UnsupportedTypeProblem'
+    Overloaded:
+      description: Request not admitted
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/OverloadedProblem'
+    Unavailable:
+      description: Check unavailable or deadline exhausted
+      headers:
+        Cache-Control:
+          required: true
+          schema:
+            type: string
+            const: no-store
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/UnavailableProblem'

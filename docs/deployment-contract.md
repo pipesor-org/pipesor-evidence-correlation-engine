@@ -1286,12 +1286,87 @@ evidence insert, a committed ORIGIN allows registration, authorized replay
 leaves one row, and a changed capture revision denies the next replay. Transport
 and caller authentication were outside that check.
 
-Before wiring the services, record the approved direction in the architecture
-source, agree the machine caller and publisher identities, review the shared
-wire request, and settle the Log/Event retry and DLQ policy with the owners.
-Acceptance must exercise evidence before the owner commit, revocation before
-registration, an unrelated scope/attempt, a lost settlement after commit, and
-a malformed body whose contents are excluded from diagnostics.
+Before runtime activation, provision the approved caller identities and
+verify the publisher boundary, then settle the Log/Event retry and DLQ policy
+with the owners. Broker acceptance must exercise evidence before the owner
+commit, revocation before registration, an unrelated scope/attempt, lost
+settlement after commit and a malformed body excluded from diagnostics.
+
+#### Internal owner validation v1
+
+The [OpenAPI contract, version 1.0.0](contracts/owner-validation-v1.openapi.yaml)
+specifies the locally approved registration path. It defines HTTPS checks
+from Log/Event to Pipeline, then from Pipeline to Ingestion. Each owner hosts
+its own operation. The existing `rel_pipeline_ingestion_github_access` remains
+the delegated human operation. The architecture records
+`rel_log_event_pipeline_operational_evidence` and
+`rel_pipeline_ingestion_machine_scope` as separate read-only relationships.
+Correlation's caller permissions and PD-033 settlement remain outside this contract.
+
+Log/Event supplies the validated event's capture scope, run and logical IDs.
+Pipeline authenticates its caller and checks current scope with Ingestion
+before reading committed operational references. The request to Ingestion
+contains only the capture tuple. Ingestion resolves the GitHub App and capture
+domain from one explicitly configured route valid for the authenticated caller
+and requested tenant. A caller with no permitted route for that tenant gets
+`DENIED`. Missing configuration for an assigned route or ambiguous resolution
+returns unavailable. Ingestion
+checks the current exact revision and permission for the completed action
+through its existing authority file. The capture tenant comes from that
+binding; the Entra token tenant independently identifies the workload issuer.
+
+Use app-only Entra bearer tokens addressed to the receiving API. Verify
+signature, configured issuer, audience, directory tenant, token version and
+validity times. Require `idtyp=app`, the allowlisted service principal
+(`oid`) and client for that receiver, and its dedicated operation role. V1 uses
+Entra v2 access tokens and `azp` for the client binding. Reject
+delegated tokens and `scp`; Pipeline acquires its own token for Ingestion.
+Use a separate machine security chain and resource-scope authorization.
+Issuer metadata, role assignments, client and principal IDs, limits and skew
+remain explicit deployment inputs. See [Microsoft Entra claim validation](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation).
+
+Issue a fresh request UUID for each hop and each attempt. Preserve the original
+`correlationId` and require equality with `X-Correlation-Id`. Match the response
+UUID and correlation ID to the one outstanding request on that authenticated
+HTTPS call. The HTTP operation binds the purpose. The response omits the
+resource tuple and can only be consumed on that request. Never cache permission
+or accept a late, mismatched or incompatible response. Each receiver caps
+`deadlineAt` by its configured budget and token expiry; Pipeline forwards its
+remaining deadline without extending it. Use a monotonic local timer once
+admitted. These checks establish permission at check time within that deadline.
+
+| Result | Mapping |
+|---|---|
+| Ingestion authorizes the current exact scope | HTTP 200 `AUTHORIZED`. Pipeline may then consult its owned references. |
+| Pipeline confirms committed exact references | HTTP 200 `AUTHORIZED`. Log/Event may proceed to the local registration decision. |
+| Resource or revision denied | HTTP 200 `DENIED`. Reveal no owner existence and perform no registration. |
+| An owner row is absent after authorization, or one contradicts the request | Pipeline returns HTTP 200 `NOT_READY` or `MISMATCH`, respectively. |
+| Caller authentication or operation permission fails | HTTP 401 or 403 at that hop. An upstream failure reaches Log/Event as unavailable for this check and requires operator attention. |
+| Bounded admission, transport, incompatible response, timeout or authority failure | Treat the check as unavailable. HTTP 429 signals overload and HTTP 503 signals unavailability or deadline exhaustion. Keep delivery disposition under PD-033. |
+
+Use bounded strict JSON, reject duplicate keys and trailing tokens, and return
+fixed problem details and `Cache-Control: no-store`. UUID relationships and
+positive integer attempt semantics still require server validation. Carry no
+log text, GitHub credentials, access token copies or protected evidence excerpts.
+Changes to required fields or outcome meanings require a new major path. A
+response outside the approved schema fails closed, including unknown outcomes.
+
+The implementation adds opt-in Pipeline and Ingestion receivers and their
+separate machine security chains. Log/Event exposes a Pipeline HTTPS authority
+for explicit composition with its intake. Pipeline obtains a recipient token
+using managed identity. Log/Event receives its own token source at composition.
+Neither HTTP hop exposes the GitHub App or capture domain in request data.
+The receivers bound slow request bodies and retain admission for work until it
+stops. Pipeline rejects an Ingestion response arriving after the deadline it
+sent, including when its recipient token expires before the original deadline.
+
+Review the two machine operations with both owners before activation. Adapter
+verification uses local signed credentials and disposable PostgreSQL to
+exercise wrong caller, audience and role, delegated tokens, scope and attempt
+crossing, a late or mismatched reply, unavailable authority, and a missing
+then committed ORIGIN. Every non-confirming outcome must leave Log/Event
+without a new evidence row. Broker identity, re-delivery and DLQ remain a
+separate activation decision.
 
 #### Approval package, implementation order and acceptance
 
