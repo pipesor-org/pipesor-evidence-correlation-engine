@@ -1,5 +1,19 @@
 # Architecture consumption
 
+## PD-031 and NLP intake preparation
+
+Correlation #8 and Recommendation #6 were verified merged. GitHub reported
+success for Recommendation's verification job. The linked
+[owner contract proposal](deployment-contract.md#pd-031-contract-proposal-for-owner-review)
+specifies the two reference reads, proposed scope delegation and replay treatment.
+Approval of the trust model and architecture changes precedes owner adapters.
+Log/Event has no executable evidence storage on the consulted main revision.
+
+The [NLP fixture capture](contracts/nlp-processed-evidence-v2.examples.json) uses its real processing assembly and
+serializer with synthetic processing and transport. Both examples preserve IDs,
+timestamp precision, optional job and fixed header correspondence. This material
+is ready for receiver design while authority and owner implementation are pending.
+
 ## Capacity before snapshot commit and remaining intake work
 
 Scope: verify the exact outbound representation before committing a new

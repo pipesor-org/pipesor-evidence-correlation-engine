@@ -654,6 +654,20 @@ through the actual NLP transformation/serializer and compare exact resulting
 IDs, strings, nullability, timestamps and provenance. This increment has no
 receiver parser and does not claim fixture interoperability validation.
 
+The [producer-captured fixtures](contracts/nlp-processed-evidence-v2.examples.json)
+record output from NLP `1d6e54f` using its actual `ProcessEvidence` and
+`CorrelationHttpDelivery` with a synthetic processor and transport. The two
+wire bodies were 1,167 and 1,144 UTF-8 bytes. Verified both nine-digit timestamps,
+external IDs as strings, the 64-bit sequence value, matching identity headers,
+nullable service/environment, and omission of `job` when absent. This checks
+producer behavior and supplies cases for a future Correlation decoder. The
+amount of data in the fixtures is insufficient for setting an operating ceiling.
+
+The same capture exercise confirmed current NLP error classification:
+`401/403` stop processing on authorization failure, `413` is permanent, and
+`429/503` are transient. The processor and transport were synthetic; no live
+HTTP, token provider, Broker settlement or sanitizer was exercised.
+
 ### Proposed completion and recovery semantics
 
 Recommendation: retain synchronous processing. `200 {"status":"accepted",
@@ -1007,6 +1021,74 @@ and [Ingestion's explicit local approvals](https://github.com/pipesor-org/pipeso
 The [data-readiness assessment](#data-readiness-assessment-for-the-first-correlation-increment)
 below narrows the minimum required guarantee and corrects historical scope
 assumptions; full historical-message attestation is not a prerequisite of DD-014.
+
+#### PD-031 contract proposal for owner review
+
+The handoff baseline is now integrated through Correlation PR #8 and
+Recommendation PR #6. This proposal covers new owner relationships and
+authorization. It records neither owner approval nor new runtime grants.
+
+| Operation | Proposed request binding | Proposed owner obligations |
+|---|---|---|
+| Correlation → Pipeline | Tenant, GitHub account/installation/repository/workflow, historical scope revision, pipeline ID, exact run/attempt, execution ID and ORIGIN incident ID. Authenticate the Correlation workload. Bind the request to the authenticated NLP producer context at Correlation. | Check current machine permission through Ingestion and verify committed pipeline, execution and ORIGIN membership against the same tuple. The human read API uses delegated user grants and cannot supply this contract. |
+| Pipeline → Ingestion | Add a machine operation on the existing relationship, which currently covers verified user access. The lookup must cover the precise capture binding and resolve the GitHub App and capture domain from trusted configuration. | Call the existing current-scope mechanism for one unambiguous machine binding. The mechanism currently compares the full capture scope, including revision. Apply an agreed policy for replays under a different current revision. |
+| Correlation → Log/Event | Authenticated Correlation workload, scope binding, execution ID, incident ID, evidence ID and source. | Verify that stored evidence exists and matches the committed binding for the scope and operation. The owner must implement evidence persistence and adopt the evidence identity rule first. Return minimal validation facts and no evidence content. |
+
+**Recommended authority choice:** Explicitly delegate the evidence-validation
+operation to Correlation for permitted resource scope. Correlation calls it only
+after Pipeline/Ingestion confirms current permission for that attempt. Log/Event
+must enforce a dedicated permission for the Correlation principal and reject
+requests outside the agreed delegation. This design relies on Correlation's
+preflight and requires that trust to be approved. Passing the original tenant
+fields or a copy of a Pipeline response cannot by itself establish permission.
+If Log/Event must check permission independently, approve an authority channel
+or verifiable scoped assertion first. The two reference reads alone do not provide
+independent authorization.
+
+**Recommended replay rule for the first cut:** require the original capture
+binding to remain authorized under the current authority's exact-revision
+check. If authority explicitly reports that binding changed or was revoked,
+deny disclosure or delivery and preserve the old operation unchanged. If the
+authority cannot be queried, return temporary unavailability. This may hold older
+pending revisions even if a new revision permits the same resource. Releasing
+them requires an explicit reauthorization rule and operational disposition.
+Never rewrite their historical scope or generate a replacement operation to
+bypass the decision. A reauthorization request needs the full capture binding.
+The five-field frozen downstream envelope alone omits account, workflow, App
+and capture domain. The verified NLP replay and trusted owner configuration
+must supply these facts. A future independent recovery entry point would need
+an agreed way to recover the omitted facts before it can authorize delivery.
+
+NLP currently pauses consumption on `401/403`. Treat denial of an individual
+resource or stale binding as a distinct owner outcome at this stage. The NLP
+wire contract must explicitly decide how to handle it without accidentally
+pausing unrelated work, disclosing reference existence or retrying forever.
+
+For recovery across unrelated authority revisions, the alternative is an explicit
+current-permission lookup by stable resource identity with the observed
+authority revision returned separately. That lookup requires a new owner
+contract and a separate disposition for historical pending work.
+
+Each owner response must bind its version and result to the validated request
+and identifiers. Propose a per-attempt validation ID and the original
+`correlation_id` for correlation. The validation ID has no persistence or
+delivery identity semantics. Check the response within the shared deadline.
+This establishes authority and committed membership at check time, with no
+claim of an atomic revocation guarantee across the later commit. `confirmed` requires matching committed facts and authorization.
+An absent committed row is `not_ready`; an outage, timeout or unrecognized reply
+is `unavailable`; a committed contradiction after authorization is `mismatch`;
+access refusal is `denied` without revealing existence. Use a shared deadline
+for the validation attempt. No non-confirming outcome may persist a new
+Correlation revision or initiate Recommendation delivery. Keep exact credentials,
+timeouts, routes, response schemas and retry exhaustion in the owner-reviewed
+contract. This proposal introduces no production defaults.
+
+The decision for approval is whether to add the two owner reads, extend the
+existing Pipeline → Ingestion relationship with the machine operation, and
+adopt scoped delegation for Log/Event with the conservative replay rule above.
+If independent Log/Event authorization is required, that part must be specified
+before implementation. Pipeline may reuse existing owner queries. Log/Event's
+storage and evidence identifier decision are separate prerequisites.
 
 #### Recommendation and architectural cost
 
