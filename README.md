@@ -148,6 +148,23 @@ Boot-managed Jackson databind. Payload and
 response budgets, cumulative overflow disposition, retry/deadline policy and
 current authority remain explicit pending decisions in the candidate record.
 
+### Local handoff to Recommendation
+
+With Java 25, Docker and a sibling checkout of Recommendation, run:
+
+```bash
+bash tools/verify_local_recommendation_handoff.sh
+```
+
+Pass a checkout path as the first argument if Recommendation is elsewhere. The
+runner prints the peer's local `main` revision, stages it in a temporary directory
+and exercises both services' durable stores with disposable PostgreSQL 17.11.
+It uses the actual Correlation client and Recommendation HTTP route. The
+loopback proxy drops the first receipt after Recommendation commits, then lets
+the replay recover `duplicate` for the same operation. The fixture supplies
+synthetic owner decisions, credentials and limits. It checks the handoff in
+isolation from the signed NLP route, live authorities and Azure.
+
 For documentation, check affected links and consistency with referenced sources,
 then run:
 

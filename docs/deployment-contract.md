@@ -1067,6 +1067,15 @@ responses. Tests cover a late reference, a crossed and then matching receipt,
 confirmed replay, a revoked earlier member, a concurrent change to the
 verified set, and expiration during upload or downstream confirmation.
 
+The [local handoff test](../README.md#local-handoff-to-recommendation) exercised
+the intake service, Correlation's HTTP sender and Recommendation's durable route
+from `9555884` on PostgreSQL 17.11. After the proxy truncated the first committed
+response, Correlation kept the revision pending. Replaying with changed template
+enrichment sent the same operation ID and bytes. Recommendation returned
+`duplicate` with one receipt row and Correlation confirmed that operation. The
+test also checked a late reference, an already confirmed replay and revocation
+without forwarding. Authority and credentials came from isolated fixtures.
+
 ### Remaining work for NLP intake and activation
 
 | Work | Proposed resolution and acceptance |
