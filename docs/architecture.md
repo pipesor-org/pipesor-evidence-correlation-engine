@@ -6,13 +6,16 @@ Correlation #8 and Recommendation #6 were verified merged. GitHub reported
 success for Recommendation's verification job. The linked
 [owner contract proposal](deployment-contract.md#pd-031-contract-proposal-for-owner-review)
 specifies the two reference reads, proposed scope delegation and replay treatment.
-Approval of the trust model and architecture changes precedes owner adapters.
-Log/Event has no executable evidence storage on the consulted main revision.
+The v1 owner contract now covers Log/Event registration through Pipeline and
+Ingestion. Log/Event owns evidence registration and its UUIDv5 identity.
+Correlation's own reference-read relationships and scope permissions still
+require approval.
 
 The [NLP fixture capture](contracts/nlp-processed-evidence-v2.examples.json) uses its real processing assembly and
 serializer with synthetic processing and transport. Both examples preserve IDs,
 timestamp precision, optional job and fixed header correspondence. This material
-is ready for receiver design while authority and owner implementation are pending.
+now verifies the [isolated v2 decoder and replay comparison](deployment-contract.md#local-v2-validation-and-input-fingerprint).
+Correlation's authenticated receiver and owner query composition remain pending.
 
 ## Capacity before snapshot commit and remaining intake work
 

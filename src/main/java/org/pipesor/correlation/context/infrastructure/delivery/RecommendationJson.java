@@ -3,9 +3,7 @@ package org.pipesor.correlation.context.infrastructure.delivery;
 import org.pipesor.correlation.context.application.ports.RecommendationDelivery.Receipt;
 import org.pipesor.correlation.context.application.ports.RecommendationDelivery.Status;
 import org.pipesor.correlation.context.application.queries.CorrelatedRevision;
-import tools.jackson.core.StreamReadFeature;
-import tools.jackson.core.json.JsonWriteFeature;
-import tools.jackson.databind.DeserializationFeature;
+import org.pipesor.correlation.shared.infrastructure.json.CanonicalJson;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -13,13 +11,10 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -27,14 +22,7 @@ import java.util.UUID;
 
 /** Strict approved typed representation; never accepts a raw request as source input. */
 final class RecommendationJson {
-    private static final JsonMapper JSON = JsonMapper.builder()
-            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .disable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
-            .disable(JsonWriteFeature.ESCAPE_NON_ASCII, JsonWriteFeature.ESCAPE_FORWARD_SLASHES,
-                    JsonWriteFeature.WRITE_HEX_UPPER_CASE)
-            .enable(JsonWriteFeature.COMBINE_UNICODE_SURROGATES_IN_UTF8)
-            .build();
+    private static final JsonMapper JSON = CanonicalJson.mapper();
     private static final DateTimeFormatter TIME = new DateTimeFormatterBuilder().appendInstant(6).toFormatter();
 
     private RecommendationJson() { }
@@ -120,11 +108,7 @@ final class RecommendationJson {
     }
 
     static String fingerprint(byte[] canonical) {
-        try {
-            return "v1:sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical));
-        } catch (NoSuchAlgorithmException impossible) {
-            throw new IllegalStateException("Required digest unavailable");
-        }
+        return CanonicalJson.fingerprint(canonical);
     }
 
     static Receipt receipt(byte[] bytes, UUID expected) {

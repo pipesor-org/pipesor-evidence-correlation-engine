@@ -640,7 +640,7 @@ There is no Correlation receiver yet.
 | Identity and tracing | `message_id` UUID text equals `Idempotency-Key`; `correlation_id` opaque text equals `X-Correlation-ID`. Valid W3C `traceparent`/`tracestate` are technical headers, never identity or authorization. Reject mismatches without echoing values. |
 | Authentication | Bearer token; NLP proposes Entra workload identity. Receiver must validate issuer, audience, authorized service/role and trusted resource-scope binding. Exact values and authority supplying tenant/capture scope remain unagreed; no allow-all mode. |
 | Capture / operational context | Preserve `source`; `capture_context` tenant UUID, account/installation decimal strings and `scope_revision`; repository/workflow decimal strings; run decimal string, positive attempt, status/conclusion; commit SHA; nullable `service`/`environment`. Verify operational identity/membership through the agreed owner contract; historical signal values need not equal the owner's latest projection. |
-| Logical IDs | Preserve `pipeline_id`, `execution_id`, `incident_id`, `evidence_id` as UUIDs. Pipeline IDs already have integrated deterministic rules; do not regenerate or change them here. NLP's computed evidence UUIDv5 is still an owner-level agreement gap with Log/Event. None proves existence or access. |
+| Logical IDs | Preserve `pipeline_id`, `execution_id`, `incident_id`, `evidence_id` as UUIDs. Pipeline IDs already have integrated deterministic rules; do not regenerate or change them here. Log/Event has adopted the producer-compatible evidence UUIDv5. None proves existence or access. |
 | Times / provenance | Preserve original UTC RFC3339 `occurred_at` and `source_updated_at` including up to nine fractional digits. Keep external IDs as strings; `sequence` may exceed 32 bits. `created_at` is an independent technical insertion time, not either source timestamp. |
 | Processed evidence | `stage`, optional `job`, nullable `sequence`, `sanitized_summary`, `sanitized_content`, `template`. Protected/minimized input only; template is not a confirmed error cause. The prefix `sanitized_` is not proof of safe content. No raw logs, credential fields or arbitrary artifacts. |
 | Compatibility / limits | Proposed: exact supported `contract_version=2.0`, unknown additive optional fields ignored consistently with NLP, unsupported major rejected. Required-field type/meaning changes are breaking. Request bytes, field/collection sizes and total processing timeout require explicit agreed numeric limits; no unbounded public parser is enabled meanwhile. |
@@ -651,8 +651,8 @@ is an **Ingestion input fixture**, not a Correlation request. It includes
 `123456789`/`987654321` fractional nanoseconds, external IDs larger than signed
 64-bit and `sequence=4294967303`. Future receiver checks must pass that artifact
 through the actual NLP transformation/serializer and compare exact resulting
-IDs, strings, nullability, timestamps and provenance. This increment has no
-receiver parser and does not claim fixture interoperability validation.
+IDs, strings, nullability, timestamps and provenance. The isolated decoder
+now consumes that captured output. See [local v2 validation](#local-v2-validation-and-input-fingerprint).
 
 The [producer-captured fixtures](contracts/nlp-processed-evidence-v2.examples.json)
 record output from NLP `1d6e54f` using its actual `ProcessEvidence` and
@@ -711,7 +711,8 @@ original correlation/source times, source, commit, service/environment,
 stage/job/sequence and sanitized summary/content. Separate mutable `template`
 enrichment from those fields; exclude authentication tokens and technical trace
 headers. Preserve agreed null/absent semantics.
-Canonicalization/hash format is a required agreement, not chosen in this increment.
+The [local v2 validation](#local-v2-validation-and-input-fingerprint) defines
+the comparison format exercised against the existing producer fixtures.
 NLP's process-local Drain3 can change `template` when the same broker message is
 processed again; see the [data-readiness assessment](#data-readiness-assessment-for-the-first-correlation-increment).
 Comparison of processed content must not silently become rejection of legitimate
@@ -771,6 +772,34 @@ late must not receive a permanent not-found response. A never-created reference,
 retry horizon and safe operational disposition require a separate explicit
 policy; an infinite retry loop is not proposed. No extra broker or polling
 relationship is introduced.
+
+#### Local v2 validation and input fingerprint
+
+The isolated decoder validates the size supplied by its caller and compares
+`Idempotency-Key` and `X-Correlation-ID` to the validated body. It preserves
+external decimal IDs and original UTC source timestamp strings, including
+nanoseconds. The logical IDs come from the producer. Owner checks must verify
+them against the authorized scope and committed records before any future
+receiver prepares a revision.
+
+The input fingerprint uses the receipt column's existing `v1:sha256:` prefix
+and the shared compact UTF-8 JSON codec. It hashes a projection of known
+significant fields with keys sorted at every level. It preserves significant
+strings exactly, including the source timestamp representation. Missing and
+explicitly null `job` produce the same projection. Unknown additive fields
+and `template` do not enter the digest. Headers are checked independently.
+The decoder computes the value in Correlation from the existing wire body.
+The original frozen signal and revision remain the durable result of a
+matching replay.
+
+Local verification passed 70 tests. The decoder matched the two captured
+producer vectors. A PostgreSQL 17.11 test recovered the same frozen revision
+after a template change and rejected a one-nanosecond source timestamp change.
+Recommendation's existing comparison and delivery tests also passed.
+
+This is an isolated codec and compatibility check. The receiver's final
+error mapping, authenticated scope, and Correlation's owner permissions
+remain under PD-031/034.
 
 <a id="concrete-http-candidate--2026-11-17"></a>
 
@@ -996,14 +1025,14 @@ or background processing guarantee is inferred. See the
 | Deadline and retries | Set one Correlation processing deadline capped by the caller's attempt budget and current credential validity. Allocate remaining time across request reading, authority and owner queries, database preparation, delivery and confirmation. Include a read deadline at the receiver as well as a byte cap. Reuse scoped NLP redelivery for unknown delivery outcomes and preserve the operation ID. Agree numeric caps, attempt/deadline budgets and exhaustion handling from representative sanitized inputs and owner measurements before activation. |
 | NLP receiver and confirmation | Use NLP's existing emitted v2 body as the contract candidate. Agree the exact compatibility, stable protected-input comparison, errors and handling of optional fields. Verify it with the real NLP serializer and exact source timestamps, then compose authorization, reference validation, bounded preparation and matching-receipt confirmation. Return NLP success only after local confirmation; an already confirmed replay also needs reauthorization. |
 
-Current owner evidence: Pipeline `84f7ac0` has execution and incident lookups and
-dashboard-facing reads; these do not implement the machine validation contract.
-Log/Event `d1f0277` remains documentation-only and must implement evidence
-persistence and adopt its identifier rule. Ingestion `1066785` has local
-current-scope verification and needs an agreed cross-service machine operation.
-NLP `1d6e54f` handles generic 4xx as permanent, 401/403 as authorization
-failures, and 429/5xx as retryable. The 937- and 1,222-byte wire fixtures
-check compatibility and cannot establish production capacity.
+Current owner evidence: the [owner validation v1 contract](#internal-owner-validation-v1)
+now covers Log/Event registration through Pipeline and Ingestion. Log/Event
+owns persisted evidence and uses the producer-compatible UUIDv5 rule. Pipeline
+and Ingestion implement the v1 machine endpoints for this registration flow.
+Correlation still needs its own query permissions and a Log/Event membership
+exchange. NLP `1d6e54f` handles generic 4xx as permanent, 401/403 as
+authorization failures, and 429/5xx as retryable. Producer fixtures check
+compatibility. They do not establish production capacity.
 
 ### PD-031 decision proposal: owner-verified references
 

@@ -4,6 +4,9 @@ import org.flywaydb.core.Flyway;
 import org.pipesor.correlation.context.application.commandhandlers.ConfirmPreparedDelivery;
 import org.pipesor.correlation.context.application.ports.RecommendationDelivery;
 import org.pipesor.correlation.context.infrastructure.delivery.RecommendationCapacity;
+import org.pipesor.correlation.context.interfaces.rest.transform.NlpEvidenceV2;
+import org.pipesor.correlation.shared.infrastructure.json.CanonicalJson;
+import tools.jackson.databind.node.ObjectNode;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.pipesor.correlation.context.application.queries.CorrelatedRevision;
 import org.junit.jupiter.api.AfterAll;
@@ -15,6 +18,8 @@ import org.pipesor.correlation.context.domain.model.valueobjects.ScopeEnvelope;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
@@ -67,6 +72,41 @@ class FrozenSignalsTest {
         }
         assertThat(store.prepare(input).snapshot().id()).isEqualTo(first.snapshot().id());
         assertThat(store.prepare(input).snapshot().signal()).isEqualTo(input.signal());
+    }
+
+    @Test
+    void producerFingerprintResumesFrozenRevisionAndRejectsNanosecondChange() throws Exception {
+        var json = CanonicalJson.mapper();
+        var fixture = json.readTree(Files.readAllBytes(Path.of("docs/contracts/nlp-processed-evidence-v2.examples.json")));
+        var body = (ObjectNode) fixture.get("with_job");
+        var evidence = NlpEvidenceV2.decode(json.writeValueAsBytes(body), 4096,
+                body.get("message_id").asString(), body.get("correlation_id").asString());
+        // Synthetic stand-ins for the future authenticated producer and scoped owner checks.
+        var scope = new ScopeEnvelope(evidence.captureContext().tenantId(), evidence.captureContext().githubInstallationId(),
+                evidence.pipeline().githubRepositoryId(), evidence.pipelineId(), evidence.captureContext().scopeRevision());
+        var context = new Context("synthetic-nlp-scope", evidence.executionId(), evidence.incidentId());
+        var first = store.prepare(new DurableCorrelationStore.Contribution(context, "synthetic-nlp-producer",
+                evidence.messageId(), evidence.evidenceId(), evidence.correlationId(), evidence.fingerprint(),
+                "First frozen summary", evidence.signal(), scope));
+        var before = counts(dataSource);
+        var replay = NlpEvidenceV2.decode(json.writeValueAsBytes(body.deepCopy().put("template", "Updated enrichment")),
+                4096, evidence.messageId().toString(), evidence.correlationId());
+        var recovered = store.prepare(new DurableCorrelationStore.Contribution(context, "synthetic-nlp-producer",
+                replay.messageId(), replay.evidenceId(), replay.correlationId(), replay.fingerprint(),
+                "Would otherwise become a different summary", replay.signal(), scope));
+        assertThat(recovered.snapshot().id()).isEqualTo(first.snapshot().id());
+        assertThat(recovered.snapshot().summary()).isEqualTo("First frozen summary");
+        assertThat(recovered.snapshot().signal()).isEqualTo(evidence.signal());
+
+        var changed = NlpEvidenceV2.decode(json.writeValueAsBytes(
+                body.deepCopy().put("source_updated_at", "2026-11-08T09:20:40.987654322Z")),
+                4096, evidence.messageId().toString(), evidence.correlationId());
+        var conflict = new DurableCorrelationStore.Contribution(context, "synthetic-nlp-producer",
+                changed.messageId(), changed.evidenceId(), changed.correlationId(), changed.fingerprint(),
+                "First frozen summary", changed.signal(), scope);
+        var failure = assertThrows(IllegalArgumentException.class, () -> store.prepare(conflict));
+        assertThat(failure.getMessage()).isEqualTo("Correlation message conflicts with its original contribution");
+        assertThat(counts(dataSource)).isEqualTo(before);
     }
 
     @Test
