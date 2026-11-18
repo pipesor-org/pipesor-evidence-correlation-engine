@@ -1087,13 +1087,59 @@ revision. The stored signal array preserves introduction order. The fixture's
 authorities, workload credentials and parser output are synthetic. Evidence is
 seeded through the Log/Event store, and broker settlement stays under PD-033.
 
+### NLP rejection and replay under PD-034 and PD-033
+
+**Locally approved reason mapping.** This narrows the error contract for
+`rel_nlp_correlation` and the disposition of its failed deliveries in the existing
+NLP subscription. The receiver is integrated in `8219894`. The prior NLP
+revision `1d6e54f` maps permanent `4xx` to
+`correlation_contract_rejected`. The receiver emits `application/problem+json`
+with `status` and `code`, including two distinct causes for `413`.
+
+| HTTP and response code | NLP disposition | Replay condition for an authorized operator |
+|---|---|---|
+| `422 RESOURCE_DENIED` | Dead-letter the individual message with the fixed reason `correlation_resource_denied`. | Verify current authorization for the original resource and capture revision. For cumulative membership, Correlation rechecks every retained member. |
+| `413 CAPACITY_EXCEEDED` | Dead-letter with the fixed reason `correlation_capacity_exceeded`. Preparation rolls back and preserves the last confirmed revision. | Verify that the same protected evidence fits the agreed downstream limit. If bounds were reduced below an already pending operation, recover its original bytes under an approved compatible bound. |
+| `413 REQUEST_TOO_LARGE` and other permanent `4xx` | Keep `correlation_contract_rejected`. This `413` concerns the inbound body cap. | Diagnose the transport or contract failure before replay. |
+| `503 UNAVAILABLE`, `429`, timeouts or transient failures | Keep bounded HTTP retries and abandon after the local attempt budget is spent. An already pending operation keeps its ID and frozen representation. | Existing broker redelivery within the agreed budget. Broker exhaustion and its disposition remain PD-033. |
+| `401` or `403` | Abandon the current message and pause consumption. | Correct caller authentication or service permissions before resuming. |
+
+For the two new reasons, NLP accepts only the exact HTTP status and code pair
+in a bounded `application/problem+json` document whose integer `status` matches
+the HTTP status. Missing, malformed, oversized, crossed or unrecognized errors
+retain the generic classification. Only the two fixed local reasons may be
+added to the existing diagnostic metadata. Response text, field values and
+evidence stay out of the reason, description and telemetry. Older NLP clients
+continue to classify both as permanent with the generic reason.
+
+**Decision needed before activation.** Name the role responsible for
+inspection, manual replay and disposal within the
+authorized NLP subscription. The documented PD-033/034 contract approvers are
+Jhon Galvez and Ramiro Guzman. That designation does not assign a queue
+operator. An approved replay preserves the original protected body, stable
+`message_id`, correlation ID and broker routing properties.
+The operator must first verify the resolved cause and required permissions.
+Automatic replay of these terminal failures is excluded. Retention, disposal and
+broker permissions must be agreed because the dead-letter queue retains the
+original message. See [NLP settlement](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/docs/integration-contracts.md#21-settlement-matrix)
+and the [pending register](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/architecture/pending-decisions.md).
+
+Local approval covers the two reason mappings. Broker retention, access,
+retry budgets and deployment settings remain open. Correlation still requires
+explicit response settings when composing its receiver.
+
+NLP `7ae942e` passed 91 tests, including HTTP interpretation, invalid problem
+documents and the existing settlement path with test doubles. A separate local
+owner-chain run with that client confirmed that the signed Correlation reply
+for a revoked historical scope produced `correlation_resource_denied` in NLP.
+
 ### Remaining work for NLP intake and activation
 
 | Work | Proposed resolution and acceptance |
 |---|---|
 | Current machine scope and PD-031 | Use Ingestion's existing machine authority as the source for current capture permission, through an agreed machine operation on the Pipeline–Ingestion relationship. Pipeline validates committed pipeline, execution/attempt and ORIGIN incident membership. Log/Event validates committed evidence against that same authorized scope and execution/incident. Both validations must be bound to the incoming request. Confirm the architecture additions and agree how Log/Event verifies the scope before either owner exposes a validation operation. |
 | Missing or denied references | Distinguish authorized but not yet visible, unavailable authority, contradiction and denial. Treat absence as retryable within an agreed horizon. Contradictions are permanent after authorization. Denials reveal no existence information. Rejected attempts create no snapshot or downstream delivery. The historical scope stays frozen when a replay is reauthorized. |
-| Cumulative request capacity | Use the approved canonical UTF-8 encoder on the exact new revision inside the preparation transaction. A capacity failure must roll back the provisional writes, preserving the prior confirmed revision. Recover an existing operation with its original representation. Propose a terminal 413 for a new revision beyond the agreed ceiling. NLP already settles generic permanent 4xx by moving the message to its existing dead-letter path; agree the reason and operator disposition under PD-034 before mapping it. A pending revision made too large by a configuration change needs explicit recovery, with its original data preserved. |
+| Cumulative request capacity | Use the approved canonical UTF-8 encoder on the exact new revision inside the preparation transaction. Overflow rolls back the provisional writes, preserving the prior confirmed revision. The locally approved `413 CAPACITY_EXCEEDED` maps to `correlation_capacity_exceeded` through NLP's existing dead-letter path. Measure the operating ceiling and agree queue and replay ownership before activation. A pending revision made too large by a configuration change needs explicit recovery with its original data preserved. |
 | Deadline and retries | Set one Correlation processing deadline capped by the caller's attempt budget and current credential validity. Allocate remaining time across request reading, authority and owner queries, database preparation, delivery and confirmation. Include a read deadline at the receiver as well as a byte cap. Reuse scoped NLP redelivery for unknown delivery outcomes and preserve the operation ID. Agree numeric caps, attempt/deadline budgets and exhaustion handling from representative sanitized inputs and owner measurements before activation. |
 | NLP receiver and confirmation | Use NLP's existing emitted v2 body as the contract candidate. Agree the exact compatibility, stable protected-input comparison, errors and handling of optional fields. Verify it with the real NLP serializer and exact source timestamps, then compose authorization, reference validation, bounded preparation and matching-receipt confirmation. Return NLP success only after local confirmation; an already confirmed replay also needs reauthorization. |
 
@@ -1101,10 +1147,11 @@ Current owner evidence: the [owner validation v1 contract](#internal-owner-valid
 now covers Log/Event registration through Pipeline and Ingestion. Log/Event
 owns persisted evidence and uses the producer-compatible UUIDv5 rule. Pipeline
 and Ingestion implement the v1 machine endpoints for this registration flow.
-Correlation still needs its own query permissions and a Log/Event membership
-exchange. NLP `1d6e54f` handles generic 4xx as permanent, 401/403 as
-authorization failures, and 429/5xx as retryable. Producer fixtures check
-compatibility. They do not establish production capacity.
+The local Correlation receiver exercises the v1.1 query paths for both owners.
+Their live query permissions remain an activation gate. NLP `1d6e54f` handles
+generic 4xx as permanent, 401/403 as authorization failures, and 429/5xx as
+retryable. Producer fixtures establish compatibility with synthetic inputs.
+Production capacity requires separate measurements.
 
 ### PD-031 decision proposal: owner-verified references
 
