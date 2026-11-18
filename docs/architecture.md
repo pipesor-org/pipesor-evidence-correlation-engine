@@ -15,7 +15,9 @@ The [NLP fixture capture](contracts/nlp-processed-evidence-v2.examples.json) use
 serializer with synthetic processing and transport. Both examples preserve IDs,
 timestamp precision, optional job and fixed header correspondence. This material
 now verifies the [isolated v2 decoder and replay comparison](deployment-contract.md#local-v2-validation-and-input-fingerprint).
-Correlation's authenticated receiver and owner query composition remain pending.
+The [explicit receiver composition](deployment-contract.md#local-signed-nlp-receiver)
+now connects the scoped owner checks to preparation and downstream confirmation.
+The default application startup remains non-web.
 
 ## Capacity before snapshot commit and remaining intake work
 

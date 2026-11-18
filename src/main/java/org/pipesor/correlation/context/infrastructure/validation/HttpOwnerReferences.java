@@ -74,15 +74,24 @@ public final class HttpOwnerReferences implements AutoCloseable {
     }
 
     public Decision verify(NlpEvidenceV2 input, Instant attemptDeadline) {
+        if (input == null) return Decision.UNAVAILABLE;
+        return verify(input, input.evidenceId(), input.captureContext().scopeRevision(), attemptDeadline);
+    }
+
+    /** Revalidate a frozen member of the same trusted attempt and stable capture resource. */
+    public Decision verify(NlpEvidenceV2 input, UUID evidenceId, String captureRevision, Instant attemptDeadline) {
         long started = System.nanoTime();
         try {
+            if (evidenceId == null || captureRevision == null || !captureRevision.matches("[A-Za-z0-9._:-]{1,128}")) {
+                return Decision.UNAVAILABLE;
+            }
             Instant limit = earlier(attemptDeadline, clock.instant().plus(timeout));
             long budget = remaining(limit, started, timeout.toNanos());
-            var operational = operationalFields(input);
+            var operational = operationalFields(input, captureRevision);
             var operationalReply = check(pipeline, Owner.PIPELINE, operational, input.correlationId(), limit, started, budget);
             if (operationalReply == null) return Decision.UNAVAILABLE;
             if (operationalReply.decision() != Decision.AUTHORIZED) return operationalReply.decision();
-            var membershipReply = check(logEvent, Owner.LOG_EVENT, membershipFields(input), input.correlationId(),
+            var membershipReply = check(logEvent, Owner.LOG_EVENT, membershipFields(input, evidenceId, captureRevision), input.correlationId(),
                     operationalReply.deadline(), started, operationalReply.budget());
             return membershipReply == null ? Decision.UNAVAILABLE : membershipReply.decision();
         } catch (RuntimeException unavailable) {
@@ -139,17 +148,17 @@ public final class HttpOwnerReferences implements AutoCloseable {
         }
     }
 
-    private static ObjectNode scopeFields(NlpEvidenceV2 input) {
+    private static ObjectNode scopeFields(NlpEvidenceV2 input, String captureRevision) {
         return CanonicalJson.mapper().createObjectNode()
                 .put("tenantId", input.captureContext().tenantId().toString())
                 .put("githubInstallationId", input.captureContext().githubInstallationId())
-                .put("scopeRevision", input.captureContext().scopeRevision())
+                .put("scopeRevision", captureRevision)
                 .put("executionId", input.executionId().toString())
                 .put("incidentId", input.incidentId().toString());
     }
 
-    private static ObjectNode operationalFields(NlpEvidenceV2 input) {
-        return scopeFields(input).put("githubAccountId", input.captureContext().githubAccountId())
+    private static ObjectNode operationalFields(NlpEvidenceV2 input, String captureRevision) {
+        return scopeFields(input, captureRevision).put("githubAccountId", input.captureContext().githubAccountId())
                 .put("githubRepositoryId", input.pipeline().githubRepositoryId())
                 .put("githubWorkflowId", input.pipeline().githubWorkflowId())
                 .put("githubRunId", input.execution().githubRunId())
@@ -157,8 +166,8 @@ public final class HttpOwnerReferences implements AutoCloseable {
                 .put("pipelineId", input.pipelineId().toString());
     }
 
-    private static ObjectNode membershipFields(NlpEvidenceV2 input) {
-        return scopeFields(input).put("evidenceId", input.evidenceId().toString()).put("source", input.source());
+    private static ObjectNode membershipFields(NlpEvidenceV2 input, UUID evidenceId, String captureRevision) {
+        return scopeFields(input, captureRevision).put("evidenceId", evidenceId.toString()).put("source", input.source());
     }
 
     private static URI endpoint(URI origin, String path, boolean loopbackTest) {

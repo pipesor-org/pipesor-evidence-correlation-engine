@@ -10,10 +10,11 @@ signal once; an internal read reconstructs the exact signals of an older revisio
 The approved scope increment also freezes each snapshot's historical tenant,
 installation, repository, optional pipeline and scope revision. This stored
 envelope does not establish current authorization.
-It includes a manually constructed Recommendation client with strict receipt
-validation and bounded HTTP; no NLP receiver or authorized delivery workflow is
-activated. The business boundary and handoff still require the
-[contract decisions](docs/deployment-contract.md#local-contract-proposal-for-decision).
+The [explicit NLP receiver composition](docs/deployment-contract.md#local-signed-nlp-receiver)
+binds a configured workload and capture scope, checks both owners before
+preparation, and confirms Recommendation's receipt before returning success.
+The default startup stays non-web. Environment identities, budgets, and the
+remaining response and broker policies are activation inputs.
 No container image or release automation is introduced.
 
 ## Documentation
@@ -146,6 +147,43 @@ or recovery integration test. It adds no application dependency; the isolated Ja
 Boot-managed Jackson databind. Payload and
 response budgets, cumulative overflow disposition, retry/deadline policy and
 current authority remain explicit pending decisions in the candidate record.
+
+### Local handoff to Recommendation
+
+With Java 25, Docker and a sibling checkout of Recommendation, run:
+
+```bash
+bash tools/verify_local_recommendation_handoff.sh
+```
+
+Pass a checkout path as the first argument if Recommendation is elsewhere. The
+runner prints the peer's local `main` revision, stages it in a temporary directory
+and exercises both services' durable stores with disposable PostgreSQL 17.11.
+It uses the actual Correlation client and Recommendation HTTP route. The
+loopback proxy drops the first receipt after Recommendation commits, then lets
+the replay recover `duplicate` for the same operation. The fixture supplies
+synthetic owner decisions, credentials and limits. It checks the handoff in
+isolation from the signed NLP route, live authorities and Azure.
+
+### Local flow with NLP and evidence owners
+
+Use Java 25, Docker and the Python 3.14 environment prepared by the
+[NLP development guide](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/README.md#development-and-verification).
+Activate that environment or set `PYTHON_BIN` to its Python executable.
+
+```bash
+bash tools/verify_local_owner_chain.sh
+```
+
+Pass the directory containing the sibling service checkouts as the first
+argument when needed. The runner stages their committed `main` revisions in a
+temporary directory. It runs the NLP processing and HTTP delivery code against
+the signed Correlation intake, the signed Pipeline and Log/Event owner checks,
+and the Recommendation receipt endpoint. The Java components use loopback HTTP
+and disposable PostgreSQL 17.11. The test supplies synthetic credentials,
+parser output, current capture permissions and Recommendation authority. It
+registers protected evidence through the Log/Event store as fixture setup.
+Service Bus settlement, live identities and deployment require separate checks.
 
 For documentation, check affected links and consistency with referenced sources,
 then run:

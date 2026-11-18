@@ -45,6 +45,14 @@ class HttpOwnerReferencesTest {
             }
             assertThat(Instant.parse(membership.get("deadlineAt").asString()))
                     .isBeforeOrEqualTo(Instant.parse(pipeline.get("deadlineAt").asString()));
+
+            var historicalEvidence = java.util.UUID.randomUUID();
+            assertThat(client.verify(input, historicalEvidence, "previous-scope-rev", Instant.now().plusSeconds(5)))
+                    .isEqualTo(Decision.AUTHORIZED);
+            assertThat(peers.pipelineRequest.get().get("scopeRevision").asString()).isEqualTo("previous-scope-rev");
+            assertThat(peers.membershipRequest.get().get("scopeRevision").asString()).isEqualTo("previous-scope-rev");
+            assertThat(peers.membershipRequest.get().get("evidenceId").asString()).isEqualTo(historicalEvidence.toString());
+            assertThat(peers.membershipRequest.get().get("executionId")).isEqualTo(membership.get("executionId"));
         }
     }
 
