@@ -1076,6 +1076,17 @@ enrichment sent the same operation ID and bytes. Recommendation returned
 test also checked a late reference, an already confirmed replay and revocation
 without forwarding. Authority and credentials came from isolated fixtures.
 
+The [local flow with NLP and evidence owners](../README.md#local-flow-with-nlp-and-evidence-owners)
+adds the Python sender, signed intake and both owner HTTP handlers to the real
+Recommendation receipt path. A missing Pipeline ORIGIN prevents the membership
+call. A missing Log/Event row also prevents preparation. Revoking A's original
+scope revision prevents B from sending A+B. With both scopes authorized, the
+first attempt has revisions A and A+B and a second attempt has a separate
+revision. The stored signal array preserves introduction order. The fixture's
+`422` is permanent to the NLP sender. The current capture and Recommendation
+authorities, workload credentials and parser output are synthetic. Evidence is
+seeded through the Log/Event store, and broker settlement stays under PD-033.
+
 ### Remaining work for NLP intake and activation
 
 | Work | Proposed resolution and acceptance |
