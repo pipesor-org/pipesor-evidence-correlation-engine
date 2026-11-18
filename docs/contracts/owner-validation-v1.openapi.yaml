@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
   title: Pipesor internal evidence owner validation
-  version: 1.0.0
-  description: Locally approved contract for PD-031 and PD-034. Each operation is hosted by its indicated data
-    owner on a separately configured internal HTTPS origin.
+  version: 1.1.0
+  description: Locally approved contract for PD-031 and PD-034. Each operation is hosted by its owner
+    on a separately configured internal HTTPS origin.
 paths:
   /internal/v1/evidence/operational-reference-checks:
     post:
@@ -53,6 +53,8 @@ paths:
           $ref: '#/components/responses/Overloaded'
         '503':
           $ref: '#/components/responses/Unavailable'
+      description: Authorizes a dedicated Log/Event registration principal or a separately configured
+        Correlation principal with its own operation role.
   /internal/v1/capture/machine-scope-checks:
     post:
       operationId: checkCaptureMachineScope
@@ -101,6 +103,57 @@ paths:
           $ref: '#/components/responses/Overloaded'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /internal/v1/evidence/membership-checks:
+    post:
+      operationId: checkEvidenceMembership
+      tags:
+      - Log/Event
+      summary: Check evidence membership inside the authorized capture scope and exact ORIGIN attempt
+      security:
+      - workloadBearer: []
+      parameters:
+      - in: header
+        name: X-Correlation-Id
+        required: true
+        schema:
+          $ref: '#/components/schemas/SafeId'
+        description: Must exactly equal the body correlationId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceMembershipRequest'
+      responses:
+        '200':
+          description: Bound decision. Absence, a crossed scope or attempt, and unbound legacy evidence
+            all return NOT_READY.
+          headers:
+            Cache-Control:
+              required: true
+              schema:
+                type: string
+                const: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationalReferenceDecision'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CallerDenied'
+        '413':
+          $ref: '#/components/responses/TooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedType'
+        '429':
+          $ref: '#/components/responses/Overloaded'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+      description: Requires the dedicated Correlation principal, operation role and permitted tenant/installation.
+        Correlation first confirms Pipeline/Ingestion for the same attempt.
 components:
   securitySchemes:
     workloadBearer:
@@ -388,6 +441,44 @@ components:
         code:
           type: string
           const: UNAVAILABLE
+    EvidenceMembershipRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - correlationId
+      - deadlineAt
+      - evidenceId
+      - executionId
+      - incidentId
+      - source
+      - tenantId
+      - githubInstallationId
+      - scopeRevision
+      properties:
+        requestId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        correlationId:
+          $ref: '#/components/schemas/SafeId'
+        deadlineAt:
+          type: string
+          format: date-time
+          pattern: Z$
+        evidenceId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        executionId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        incidentId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        source:
+          type: string
+          const: github_actions
+        tenantId:
+          $ref: '#/components/schemas/CanonicalUuid'
+        githubInstallationId:
+          $ref: '#/components/schemas/GithubId'
+        scopeRevision:
+          $ref: '#/components/schemas/SafeId'
   responses:
     InvalidRequest:
       description: Invalid request
