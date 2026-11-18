@@ -1112,12 +1112,91 @@ Correlation revision or initiate Recommendation delivery. Keep exact credentials
 timeouts, routes, response schemas and retry exhaustion in the owner-reviewed
 contract. This proposal introduces no production defaults.
 
-The decision for approval is whether to add the two owner reads, extend the
-existing Pipeline → Ingestion relationship with the machine operation, and
-adopt scoped delegation for Log/Event with the conservative replay rule above.
-If independent Log/Event authorization is required, that part must be specified
-before implementation. Pipeline may reuse existing owner queries. Log/Event's
-storage and evidence identifier decision are separate prerequisites.
+The decision for approval is whether to add the two Correlation owner reads
+and adopt scoped delegation for Log/Event with the conservative replay rule
+above. The integrated Pipeline → Ingestion machine operation is reusable.
+Log/Event has implemented evidence registration and adopted its evidence
+identifier. The remaining scope binding is specified in the proposal below.
+
+#### Correlation membership scope after owner validation v1
+
+**Locally approved PD-031/034 extension.** Correlation #12 integrated the v2
+decoder and replay comparison. The integrated owner validation v1 already
+covers Log/Event → Pipeline → Ingestion for registration. The approved
+extension records the two Correlation owner reads and DD-025 in the
+[owning model](https://github.com/pipesor-org/pipesor-docs/blob/main/model/domain_decisions.md#DD-025).
+It reuses Pipeline's
+operational reference request and outcome semantics with a separately
+configured Correlation principal and permission. Preserve the existing
+Log/Event registration permission. Pipeline continues to check current
+machine scope through Ingestion before reading the exact ORIGIN membership.
+See [Pipeline's machine security configuration](https://github.com/pipesor-org/pipesor-pipeline-service/blob/main/src/main/java/org/pipesor/pipeline/configuration/OwnerValidationConfiguration.java).
+
+Log/Event already has an owned membership lookup and the compatible evidence
+UUIDv5 rule. Its stored row identifies source, execution and incident.
+Those facts can confirm the attempt, but the row has no capture tenant,
+installation or revision. The deterministic execution UUID does not include
+these scope fields. A successful Pipeline check for the claimed scope therefore
+cannot establish that a supplied evidence ID was registered under that scope.
+In particular, looking up an arbitrary evidence ID and returning `MISMATCH`
+could disclose the existence of evidence from another scope.
+See the [Log/Event schema](https://github.com/pipesor-org/pipesor-log-event-service/blob/main/src/main/resources/db/migration/V1__create_evidence_items.sql).
+
+**Evidence binding.** Freeze the capture tenant, installation and scope
+revision with each new evidence registration in Log/Event's owned model.
+Use the committed execution/incident membership checked through Pipeline for
+repository, workflow, run and attempt. Compare the three scope fields on
+registration replay and preserve the first accepted binding. A changed scope
+under the same ID is a conflict. This records the minimum scope needed for
+membership and keeps the existing sanitized projection. Historical proof of the
+full protected message would be a separate capability.
+
+The Log/Event operation takes a fresh request ID, correlation ID,
+shared deadline, evidence UUID, execution and incident UUIDs, source, and the
+three scope fields. It returns a decision bound to the request ID and
+correlation ID. Authenticate Correlation and authorize its dedicated
+membership operation for the requested scope first. Explicitly trust Correlation
+to perform the Pipeline/Ingestion preflight on the same request and exact
+capture revision, then restrict Log/Event's lookup by evidence ID, frozen
+scope, and the authorized execution and incident. Execution and incident
+must be part of the filter because one installation or revision label can
+cover multiple attempts. An absent row, a crossed scope or attempt, and a
+legacy row with no verified scope all return the same `NOT_READY`. Only after
+a scoped match may Log/Event classify a contradictory source as
+`MISMATCH`. Return no evidence text. Scope confirmation is request-bound
+and expires with its deadline.
+
+Ingestion's capture ledger already associates message IDs with capture scope.
+An owner-provided lookup against that ledger could avoid adding fields to
+Log/Event, but would need an approved cross-service exchange and agreement
+that the upstream metadata remains available for evidence reads throughout
+its retention horizon. The ledger verifies publication provenance while
+Log/Event remains the owner of committed evidence. Prefer the small binding
+at registration for the first receiver. For legacy rows, propose leaving
+the binding unavailable until an approved reconciliation proves the original
+scope. Never infer it from the current request or revise a previously bound row.
+See [Ingestion's capture ledger](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/blob/main/src/main/resources/db/migration/V2__capture_publication_ledger.sql).
+
+**Acceptance.** The user approved the two reads, scoped delegation and
+minimal owner model change after reviewing this proposal. The [v1.1 OpenAPI
+contract](contracts/owner-validation-v1.openapi.yaml) adds the scoped
+membership operation and preserves the two existing request shapes.
+Verify a late row becoming
+visible, two scopes for the same attempt, and two workflows sharing tenant,
+installation and revision. Crossed or unbound evidence must produce the same
+safe response as absence. Exercise changed scope on replay and timeout or
+unavailable authority. A non-confirming result produces neither a snapshot
+nor a Recommendation call. A confirmed replay still requires both checks and
+keeps its existing operation ID. The NLP wire disposition for resource denial
+and the broker retry horizon remain separate decisions. Its existing
+`401/403` handling pauses the worker.
+
+The local Correlation HTTPS client composes the two reads from one decoded
+NLP input. It takes separate recipient tokens, sends the original correlation
+ID with a fresh request ID per hop, and stops on any non-confirming
+operational reply. The membership request cannot extend the operational
+deadline, including the earlier expiry of the Pipeline token. This client
+requires an already authenticated NLP scope from its eventual caller.
 
 #### Recommendation and architectural cost
 
