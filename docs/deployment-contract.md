@@ -1206,6 +1206,93 @@ these queries. The contract must explicitly accept authorization at check time
 within an agreed operation deadline, or specify stronger coordination separately;
 this proposal does not promise instantaneous revocation across services.
 
+#### Log/Event registration before correlation
+
+**Locally approved implementation scope under PD-031 and PD-033.** The user
+approved proceeding with the Log/Event registration check through Pipeline.
+The cross-service wire contract, architecture source update and runtime
+settings still require their owning review. Log/Event #4
+(`f63364f`) integrated evidence registration, membership and UUIDv5 identity.
+The subsequent local intake was verified with an Ingestion-produced v2 fixture,
+an injected test authority and disposable PostgreSQL. The two owner reads
+proposed above protect Correlation's later snapshot. The registration
+authority is needed earlier, on the broker delivery to Log/Event.
+
+**PD-031 registration check.** Allow Log/Event to call the same bound
+operational-reference check proposed for Correlation → Pipeline, with a
+separate registration permission. Pipeline checks committed repository/workflow,
+run/attempt and automatic ORIGIN membership and reuses the proposed
+Pipeline → Ingestion machine operation for current permission on the exact
+capture revision. Bind the caller, operation, scope, logical IDs and
+correlation to the same request and response under a shared deadline. A change
+in the authorized binding or its revision denies this attempt and preserves
+existing records. After authorization, a missing owner row is
+`not_ready`, including evidence delivered before its execution snapshot.
+Ingestion authority unavailability is a separate retryable outcome.
+The current scope check establishes permission at check time. The original
+revision is provenance supplied by the protected producer. Evidence v2 carries
+neither the App ID nor capture domain, so Ingestion must resolve both through
+trusted configuration and reject ambiguous bindings. This proposal requires
+an explicit Log/Event → Pipeline relationship and a publisher trust policy for
+the existing broker path. Prefer restricting effective send access to Ingestion
+on its existing topic if the topology allows it. Include inherited roles in
+that review. Subscription filters only select messages by properties. If other
+principals can send into the topic, require an approved verifiable producer
+binding before accepting its deliveries. See [Service Bus RBAC scope](https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-managed-service-identity#understand-service-bus-rbac-scope-levels).
+The IaC baseline at `b461252` still defers broker entities and runtime access,
+so the existing configuration cannot demonstrate publisher exclusivity. See the
+[IaC messaging assessment](https://github.com/pipesor-org/pipesor-iac/blob/main/docs/messaging-topology-assessment.md).
+
+Exact historical attestation would require an approved check against
+Ingestion's frozen output record or a verifiable producer assertion. It would
+also need an agreed replay horizon beyond which the original protected output
+may be unavailable. Keep it separate from the minimum owner membership and
+current permission checks. No new evidence columns, capture ledger or raw log
+storage are proposed. See [Ingestion's publication lifecycle](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/blob/main/docs/deployment-contract.md#durable-capturepublication-lifecycle)
+and the [Log/Event architecture](https://github.com/pipesor-org/pipesor-log-event-service/blob/main/docs/architecture.md).
+
+**Proposed PD-033 settlement for Log/Event's subscription.** Use manual
+settlement after the registration result. Pipeline and NLP retain their own
+completion criteria. Broker redelivery can happen after the evidence commit.
+
+| Result | Proposed action |
+|---|---|
+| Evidence created and committed, or same persisted projection confirmed on authorized replay | Complete. A lost lock or failed completion may cause another delivery. Verify authority on the replay and compare against the same row. |
+| Owner row late or unconfirmed, authority unavailable, or transient store failure | Leave replayable under the approved retry budget. A timeout or exhausted retry budget never means the evidence was registered. |
+| Committed reference contradiction or reused identity with a different persisted projection | Do not complete as success. Use the approved permanent-failure policy with safe reason metadata. Preserve the first accepted row. |
+| Resource or revision denied, malformed input, unsupported major, or suspected protection failure | Do not register. Resource denial applies to this delivery. Caller authentication failure is an operational stop condition. Agree disposition for each reason before activation. |
+
+The owner review must select a bounded retry policy for late owner rows and
+an operating procedure for exhaustion, permanent failures and authorized replay.
+Service Bus DLQ retains message bodies, including automatic dead-lettering on
+exhaustion. Safe reason codes alone do not protect a malformed or untrusted
+body. Agree restricted access, cleanup and handling of suspected unsafe input
+before enabling the receiver. Keep Pipeline's delivery-count policy scoped to
+its subscription. See the [Service Bus DLQ documentation](https://learn.microsoft.com/en-us/azure/service-bus-messaging/service-bus-dead-letter-queues),
+[Pipeline settlement](https://github.com/pipesor-org/pipesor-pipeline-service/blob/main/docs/architecture.md)
+and [NLP settlement](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/docs/integration-contracts.md#21-settlement-matrix).
+
+The local increment adds Pipeline's read-only owner check, Ingestion's
+exact-revision check through an explicitly trusted capture route, and the
+validated correlation ID in Log/Event's registration authority. Pipeline's
+lookup uses a single PostgreSQL statement after scope authorization. Ingestion
+requires the completed action and uses the existing authority file.
+
+Local verification passed 73 Pipeline tests, 564 Ingestion tests and 31
+Log/Event tests. A separate in-process check wired the three implementations
+through test-only adapters with the producer fixture, the filesystem scope
+authority and PostgreSQL 17.11. It verified that late owner records prevent an
+evidence insert, a committed ORIGIN allows registration, authorized replay
+leaves one row, and a changed capture revision denies the next replay. Transport
+and caller authentication were outside that check.
+
+Before wiring the services, record the approved direction in the architecture
+source, agree the machine caller and publisher identities, review the shared
+wire request, and settle the Log/Event retry and DLQ policy with the owners.
+Acceptance must exercise evidence before the owner commit, revocation before
+registration, an unrelated scope/attempt, a lost settlement after commit, and
+a malformed body whose contents are excluded from diagnostics.
+
 #### Approval package, implementation order and acceptance
 
 The requested decision is whether to adopt owner validation queries and the
