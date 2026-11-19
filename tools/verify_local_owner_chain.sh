@@ -21,6 +21,12 @@ case "$llm_mode" in
     *) exit 2 ;;
 esac
 case "$rag_mode" in fixture|hybrid|pgvector-fixture) ;; *) exit 2 ;; esac
+review_fixture=no-review
+if [[ "${PIPESOR_DEMO_REVIEW:-0}" == 1 ]]; then
+    [[ "$scenario:$rag_mode:$llm_mode" == E02:pgvector-fixture:fixture ]] || exit 2
+    : "${PIPESOR_DEMO_BROWSER_CHECK:?Set the integrated review browser verifier}"
+    review_fixture=review
+fi
 cleanup() {
     if [[ -n "$rag_pid" ]]; then
         kill "$rag_pid" 2>/dev/null || true
@@ -83,6 +89,7 @@ case "$scenario" in
         ;;
     *) exit 2 ;;
 esac
+cp "$correlation/tools/local-handoff/$review_fixture/DemoReview.java" "$host/src/test/java/"
 cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis,FoundryDiagnosticFixture}.java "$host/src/test/java/"
 
 rag_env=(PYTHONPATH="$fixture/rag-retrieval/src" PIPESOR_DEMO_SCENARIO="$scenario" PIPESOR_DEMO_RAG_MODE="$rag_mode")

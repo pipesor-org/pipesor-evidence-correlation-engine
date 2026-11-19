@@ -64,7 +64,12 @@ def run_baseline(manifest, args):
     if managed:
         require(sha(MANIFEST.read_bytes()) == "14f23d2c59c726bcf29867ec1eb2ecbb11145c7a363a88d76f3810a493a390eb",
                 "Managed scenarios require the immutable v1.1.0 manifest")
-    refs = baseline["refs"]
+    refs = dict(baseline["refs"])
+    if args.review_recommendation_ref:
+        require(case["id"] == "E02" and not managed and args.browser,
+                "Integrated review requires deterministic E02 and the review browser harness")
+        refs["recommendation"] = git(REPO.parent / "pipesor-recommendation-service", "rev-parse",
+                                    "--verify", args.review_recommendation_ref + "^{commit}").decode().strip()
     checkout = REPO / case.get("log", "tools/local-handoff/checkout-failure.log")
     require(sha(checkout.read_bytes()) == case["checkout_log_sha256"], "Log fixture checksum differs")
     envelope = ((REPO / case["envelope"]).read_bytes() if case is not baseline else
@@ -72,7 +77,7 @@ def run_baseline(manifest, args):
                     refs["log_event"] + ":src/test/resources/protected-workflow-evidence-v2.json"))
     require(sha(envelope) == case["envelope_sha256"], "Envelope checksum differs")
     env = {k: os.environ[k] for k in ("PATH", "HOME", "JAVA_HOME", "DOCKER_HOST", "DOCKER_CONTEXT",
-                                     "DOCKER_CONFIG", "PYTHON_BIN", "PIPESOR_PLAYWRIGHT_MODULE") if k in os.environ}
+                                     "DOCKER_CONFIG", "PYTHON_BIN", "PIPESOR_PLAYWRIGHT_MODULE", "PIPESOR_CHROMIUM_EXECUTABLE") if k in os.environ}
     env.update(PIPESOR_DEMO_RAG_MODE="fixture" if case is baseline else "pgvector-fixture",
                PIPESOR_DEMO_LLM_MODE="fixture", PIPESOR_DEMO_SCENARIO=case["id"])
     env.update({f"PIPESOR_DEMO_{k.upper()}_REF": v for k, v in refs.items()})
@@ -90,6 +95,8 @@ def run_baseline(manifest, args):
                    PIPESOR_RAG_EMBEDDING_MODEL_VERSION="1")
         if "AZURE_CONFIG_DIR" in os.environ:
             env["AZURE_CONFIG_DIR"] = os.environ["AZURE_CONFIG_DIR"]
+    if args.review_recommendation_ref:
+        env["PIPESOR_DEMO_REVIEW"] = "1"
     if args.browser:
         env["PIPESOR_DEMO_BROWSER_CHECK"] = str(args.browser.resolve(strict=True))
     directory = args.evidence.resolve()
@@ -112,7 +119,11 @@ def run_baseline(manifest, args):
                     f"PIPESOR_RAG_HTTP {statuses} wrong-caller=403")
     if managed:
         markers += ("PIPESOR_FOUNDRY_VALIDATION accepted evidence and citation contract", "PIPESOR_EMBEDDING_USAGE ")
-    if args.browser:
+    if args.review_recommendation_ref:
+        markers += ("PIPESOR_DIAGNOSIS_ADMITTED ", "PIPESOR_INTEGRATED_REVIEW_RECEIPT ",
+                    "PIPESOR_INTEGRATED_REVIEW persisted CONFIRMED CORRECTED REJECTED; cross-scope 404",
+                    "P3_REACT CONFIRMED", "P3_REACT CORRECTED", "P3_REACT REJECTED")
+    elif args.browser:
         markers += ("PIPESOR_DIAGNOSTIC_BROWSER en", "PIPESOR_DIAGNOSTIC_BROWSER es")
     missing = [m for m in markers if m not in output]
     passed = result.returncode == 0 and not missing
@@ -138,6 +149,12 @@ def run_baseline(manifest, args):
             "P3": "pending; no human-review transition exercised",
         },
     }
+    if args.review_recommendation_ref:
+        marker = "PIPESOR_INTEGRATED_REVIEW_RECEIPT "
+        receipt["human_review"] = next((json.loads(line.removeprefix(marker)) for line in output.splitlines()
+                                        if line.startswith(marker)), None)
+        receipt["properties"]["P3"] = ("locally exercised through three persisted browser submissions"
+                                      if passed else "not verified by this run")
     files = ["owner-chain.log", "receipt.json"]
     if managed:
         def marked(marker):
@@ -168,6 +185,7 @@ def main():
     run.add_argument("scenario")
     run.add_argument("--evidence", type=Path, required=True)
     run.add_argument("--browser", type=Path)
+    run.add_argument("--review-recommendation-ref")
     run.add_argument("--foundry-ledger", type=Path)
     args = parser.parse_args()
     try:
