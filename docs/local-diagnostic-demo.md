@@ -1,5 +1,8 @@
 # Local diagnostic demonstration
 
+For the manuscript property mapping and planned external cases, see the
+[preliminary scenario suite](preliminary-validation.md).
+
 ## Run
 
 From the directory containing the sibling service checkouts, use Java 25,

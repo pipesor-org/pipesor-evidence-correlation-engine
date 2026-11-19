@@ -7,6 +7,7 @@ python_bin=$("${PYTHON_BIN:-python3.14}" -c 'import drain3, uvicorn, sys; print(
 fixture=$(mktemp -d /tmp/pipesor-owner-chain.XXXXXXXX)
 rag_pid=
 rag_db=
+scenario=${PIPESOR_DEMO_SCENARIO:-local-checkout-dns}
 rag_mode=${PIPESOR_DEMO_RAG_MODE:-fixture}
 llm_mode=${PIPESOR_DEMO_LLM_MODE:-fixture}
 case "$llm_mode" in
@@ -19,7 +20,7 @@ case "$llm_mode" in
         ;;
     *) exit 2 ;;
 esac
-case "$rag_mode" in fixture|hybrid) ;; *) exit 2 ;; esac
+case "$rag_mode" in fixture|hybrid|pgvector-fixture) ;; *) exit 2 ;; esac
 cleanup() {
     if [[ -n "$rag_pid" ]]; then
         kill "$rag_pid" 2>/dev/null || true
@@ -40,9 +41,9 @@ stage() {
     git -C "$peers/pipesor-$peer" archive "$revision" | tar -xf - -C "$fixture/$peer"
 }
 
-for peer in pipeline-service log-event-service nlp-log-processor; do
-    stage "$peer" main
-done
+stage pipeline-service "${PIPESOR_DEMO_PIPELINE_REF:-main}"
+stage log-event-service "${PIPESOR_DEMO_LOG_EVENT_REF:-main}"
+stage nlp-log-processor "${PIPESOR_DEMO_NLP_REF:-main}"
 stage recommendation-service "${PIPESOR_DEMO_RECOMMENDATION_REF:-main}"
 stage rag-retrieval "${PIPESOR_DEMO_RAG_REF:-main}"
 
@@ -61,17 +62,24 @@ copy_peer "$correlation" correlation-migrations org
 copy_peer "$fixture/log-event-service" log-event-migrations org
 copy_peer "$fixture/recommendation-service" recommendation-migrations com
 
-cp "$fixture/log-event-service/src/test/resources/protected-workflow-evidence-v2.json" "$resources/"
+case "$scenario" in
+    local-checkout-dns)
+        cp "$fixture/log-event-service/src/test/resources/protected-workflow-evidence-v2.json" "$resources/"
+        cp "$correlation/tools/local-handoff/checkout-failure.log" "$resources/"
+        ;;
+    E02|E03)
+        [[ "$rag_mode:$llm_mode" == pgvector-fixture:fixture ||
+            "$rag_mode:$llm_mode" == hybrid:foundry ]] || exit 2
+        cp "$correlation/tools/preliminary/fixtures/$scenario.json" "$resources/protected-workflow-evidence-v2.json"
+        cp "$correlation/tools/preliminary/fixtures/$scenario.log" "$resources/checkout-failure.log"
+        ;;
+    *) exit 2 ;;
+esac
 cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis,FoundryDiagnosticFixture}.java "$host/src/test/java/"
 
-cp "$correlation/tools/local-handoff/checkout-failure.log" "$resources/"
-
-rag_env=(PYTHONPATH="$fixture/rag-retrieval/src")
+rag_env=(PYTHONPATH="$fixture/rag-retrieval/src" PIPESOR_DEMO_SCENARIO="$scenario" PIPESOR_DEMO_RAG_MODE="$rag_mode")
 rag_server=serve_rag_fixture.py
-if [[ "$rag_mode" == hybrid ]]; then
-    : "${PIPESOR_RAG_AZURE_OPENAI_ENDPOINT:?Set the approved managed embedding endpoint}"
-    : "${PIPESOR_RAG_AZURE_OPENAI_DEPLOYMENT:?Set the approved embedding deployment}"
-    : "${PIPESOR_RAG_EMBEDDING_MODEL_VERSION:?Set the approved embedding model version}"
+if [[ "$rag_mode" != fixture ]]; then
     rag_server=serve_hybrid_rag.py
     rag_db=$(docker run --rm -d -p 127.0.0.1::5432 \
         -e POSTGRES_PASSWORD=pipesor-local-only -e POSTGRES_DB=pipesor_rag \
@@ -82,13 +90,18 @@ if [[ "$rag_mode" == hybrid ]]; then
     done
     docker exec "$rag_db" psql -v ON_ERROR_STOP=1 -U postgres -d pipesor_rag -c 'CREATE EXTENSION vector'
     db_address=$(docker port "$rag_db" 5432/tcp)
-    rag_env+=(PATH="$PATH" HOME="$HOME" AZURE_CONFIG_DIR="${AZURE_CONFIG_DIR:-$HOME/.azure}" \
-        PIPESOR_RAG_ENVIRONMENT=test PIPESOR_RAG_STORAGE_BACKEND=postgresql \
-        PIPESOR_RAG_EMBEDDING_BACKEND=azure_openai \
-        PIPESOR_RAG_DATABASE_URL="postgresql+psycopg://postgres:pipesor-local-only@$db_address/pipesor_rag" \
-        PIPESOR_RAG_AZURE_OPENAI_ENDPOINT="$PIPESOR_RAG_AZURE_OPENAI_ENDPOINT" \
-        PIPESOR_RAG_AZURE_OPENAI_DEPLOYMENT="$PIPESOR_RAG_AZURE_OPENAI_DEPLOYMENT" \
-        PIPESOR_RAG_EMBEDDING_MODEL_VERSION="$PIPESOR_RAG_EMBEDDING_MODEL_VERSION")
+    rag_env+=(PIPESOR_RAG_ENVIRONMENT=test PIPESOR_RAG_STORAGE_BACKEND=postgresql
+        PIPESOR_RAG_DATABASE_URL="postgresql+psycopg://postgres:pipesor-local-only@$db_address/pipesor_rag")
+    if [[ "$rag_mode" == hybrid ]]; then
+        rag_env+=(PATH="$PATH" HOME="$HOME" AZURE_CONFIG_DIR="${AZURE_CONFIG_DIR:-$HOME/.azure}"
+            PIPESOR_RAG_EMBEDDING_BACKEND=azure_openai
+            PIPESOR_RAG_AZURE_OPENAI_ENDPOINT="${PIPESOR_RAG_AZURE_OPENAI_ENDPOINT:?Set the approved embedding endpoint}"
+            PIPESOR_RAG_AZURE_OPENAI_DEPLOYMENT="${PIPESOR_RAG_AZURE_OPENAI_DEPLOYMENT:?Set the approved embedding deployment}"
+            PIPESOR_RAG_EMBEDDING_MODEL_VERSION="${PIPESOR_RAG_EMBEDDING_MODEL_VERSION:?Set the approved embedding model version}")
+    fi
+    if [[ "$scenario" != local-checkout-dns && "$rag_mode" == hybrid ]]; then
+        rag_env+=(PIPESOR_RAG_EMBEDDING_MAX_RETRIES=0 AZURE_TOKEN_CREDENTIALS=AzureCliCredential)
+    fi
     (cd "$fixture/rag-retrieval" && env -i "${rag_env[@]}" "$python_bin" -m alembic upgrade head)
 fi
 
@@ -102,13 +115,14 @@ for attempt in {1..450}; do
     sleep 0.1
 done
 rag_port=$(<"$fixture/rag-port")
-if [[ "$rag_mode" == hybrid ]]; then
+if [[ "$rag_mode" != fixture ]]; then
     env -i "${rag_env[@]}" "$python_bin" "$correlation/tools/local-handoff/$rag_server" \
         "$resources/protected-workflow-evidence-v2.json" "$fixture/rag-port" verify
 fi
 
 cd "$host"
 PYTHONPATH="$fixture/nlp-log-processor/src" ./mvnw -B -ntp -Dtest=FullOwnerChainTest \
+    "-Dpipesor.fixture.scenario=$scenario" \
     "-Dpipesor.fixture.rag.port=$rag_port" \
     "-Dpipesor.fixture.rag.mode=$rag_mode" \
     "-Dpipesor.fixture.llm.mode=$llm_mode" \

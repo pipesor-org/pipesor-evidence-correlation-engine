@@ -170,7 +170,8 @@ isolation from the signed NLP route, live authorities and Azure.
 Run `bash tools/verify_local_owner_chain.sh` with Java 25, Docker and a Python
 environment containing the NLP and RAG dependencies. The [demonstration guide](docs/local-diagnostic-demo.md)
 covers the companion Recommendation checkout, synthetic input, verified output,
-and evaluation boundaries.
+and evaluation boundaries. The [preliminary scenario runbook](docs/preliminary-validation-increment-2.md)
+covers the three synthetic cases using the same owner chain.
 
 For documentation, check affected links and consistency with referenced sources,
 then run:

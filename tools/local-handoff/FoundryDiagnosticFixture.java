@@ -29,6 +29,8 @@ public final class FoundryDiagnosticFixture {
             throw new IllegalArgumentException("Set PIPESOR_DEMO_FOUNDRY_EVIDENCE_DIR to a protected directory");
         }
         Path evidenceDir = Path.of(evidencePath);
+        String scenario = System.getProperty("pipesor.fixture.scenario", "local-checkout-dns");
+        boolean preliminary = scenario.equals("E02") || scenario.equals("E03");
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(TIMEOUT).build());
         factory.setReadTimeout(TIMEOUT);
@@ -44,7 +46,7 @@ public final class FoundryDiagnosticFixture {
                     }
                     Path receipt = null;
                     // One slot per outbound attempt, including timeout or non-2xx.
-                    for (int i = 1; i <= 8; i++) {
+                    for (int i = 1; i <= (preliminary ? 6 : 8); i++) {
                         try {
                             receipt = Files.createFile(evidenceDir.resolve("attempt-" + i + ".json"));
                             break;
@@ -54,6 +56,7 @@ public final class FoundryDiagnosticFixture {
                     }
                     if (receipt == null) throw new IllegalStateException("Foundry smoke request budget exhausted");
                     var info = new LinkedHashMap<String, Object>();
+                    info.put("scenario", scenario);
                     info.put("deployment", DEPLOYMENT);
                     info.put("endpoint", request.getURI().toString());
                     info.put("authentication", "Azure CLI-backed Microsoft Entra");
@@ -71,6 +74,10 @@ public final class FoundryDiagnosticFixture {
                                     info.put("prompt_tokens", payload.at("/usage/prompt_tokens").asInt());
                                     info.put("completion_tokens", payload.at("/usage/completion_tokens").asInt());
                                     info.put("finish_reason", payload.at("/choices/0/finish_reason").asString());
+                                    if (preliminary) {
+                                        // The preliminary runner admits only the pinned synthetic inputs.
+                                        info.put("synthetic_model_output", payload.at("/choices/0/message/content").asString());
+                                    }
                                 } else {
                                     info.put("error_code", payload.at("/error/code").asString()
                                             .replaceAll("[^a-zA-Z0-9_.-]", ""));
@@ -90,6 +97,7 @@ public final class FoundryDiagnosticFixture {
                         throw failure;
                     } finally {
                         Files.writeString(receipt, JSON.writeValueAsString(info));
+                        info.remove("synthetic_model_output");
                         System.out.println("PIPESOR_FOUNDRY_RECEIPT " + JSON.writeValueAsString(info));
                     }
                 }).build();
