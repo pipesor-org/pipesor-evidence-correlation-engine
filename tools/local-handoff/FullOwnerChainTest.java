@@ -1,5 +1,7 @@
 package org.pipesor.correlation.context.infrastructure.delivery;
 
+import com.pipesor.recommendation.diagnosis.application.DiagnosticOrchestrator.Diagnosis;
+import com.pipesor.recommendation.diagnosis.interfaces.rest.LocalDiagnosticEndpoint;
 import com.pipesor.recommendation.receipt.ReceiptEndpoint;
 import com.sun.net.httpserver.HttpServer;
 import org.flywaydb.core.Flyway;
@@ -38,19 +40,26 @@ import tools.jackson.databind.node.ObjectNode;
 import javax.sql.DataSource;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = PipelineServiceApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.flyway.enabled=true")
+        properties = {"spring.flyway.enabled=true", "server.address=127.0.0.1"})
 @Import({PostgresTestConfiguration.class, OwnerChain.Fixture.class, FullOwnerChainTest.ReceiptFixture.class})
 class FullOwnerChainTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -66,10 +75,22 @@ class FullOwnerChainTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ExecutionSnapshotService snapshots;
     @Autowired OwnerChain.Scope scope;
+    @Autowired LocalRead localRead;
 
     @DynamicPropertySource
     static void settings(DynamicPropertyRegistry registry) {
         OwnerChain.properties(registry);
+    }
+
+    static final class LocalRead {
+        final AtomicReference<Diagnosis> result = new AtomicReference<>();
+        final String token;
+
+        LocalRead() {
+            var random = new byte[32];
+            new SecureRandom().nextBytes(random);
+            token = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+        }
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -77,8 +98,15 @@ class FullOwnerChainTest {
         @Bean @Order(1)
         SecurityFilterChain fixtureReceiptSecurity(HttpSecurity http) throws Exception {
             // The test-only route delegates caller decisions to the actual receipt endpoint.
-            return http.securityMatcher("/internal/v1/correlated-contexts")
+            return http.securityMatcher("/internal/v1/correlated-contexts", LocalDiagnosticEndpoint.PATH)
                     .csrf(csrf -> csrf.disable()).authorizeHttpRequests(r -> r.anyRequest().permitAll()).build();
+        }
+
+        @Bean LocalRead localRead() { return new LocalRead(); }
+
+        @Bean
+        RouterFunction<ServerResponse> fixtureDiagnosticRoute(LocalRead read) {
+            return LocalDiagnosticEndpoint.routes(read.token, read.result::get);
         }
 
         @Bean
@@ -94,7 +122,14 @@ class FullOwnerChainTest {
         migrate("evidence", "correlation_fixture_history", "correlation-migrations");
         migrate("diagnosis", "recommendation_fixture_history", "recommendation-migrations");
 
+        assertThat(readDiagnosis(null).statusCode()).isEqualTo(401);
+        assertThat(readDiagnosis(localRead.token).statusCode()).isEqualTo(503);
+
         ObjectNode a = protectedFixture();
+        try (var log = FullOwnerChainTest.class.getResourceAsStream("/checkout-failure.log")) {
+            ((ObjectNode) a.get("evidence")).put("excerpt",
+                    new String(log.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip());
+        }
         ObjectNode b = a.deepCopy().put("message_id", UUID.randomUUID().toString());
         ((ObjectNode) b.get("capture_context")).put("scope_revision", MEMBER_B_REVISION);
         ObjectNode c = a.deepCopy().put("message_id", UUID.randomUUID().toString());
@@ -122,23 +157,27 @@ class FullOwnerChainTest {
                 api.start();
                 URI endpoint = loopback(api.getAddress().getPort());
 
-                assertRetryable(send(a, endpoint, "Synthetic template"));
+                assertRetryable(send(a, endpoint, null));
                 assertThat(scope.queries).hasSize(1);
                 assertThat(owners.membershipCalls).hasValue(0);
                 assertEmptyCorrelation();
                 createOrigin(a, binding);
-                assertRetryable(send(a, endpoint, "Synthetic template"));
+                assertRetryable(send(a, endpoint, null));
                 assertThat(owners.membershipCalls).hasValue(1);
                 assertEmptyCorrelation();
 
                 assertThat(owners.evidenceStore.register(eventA.input())).isEqualTo(Registration.CREATED);
-                assertNlp(send(a, endpoint, "Synthetic template"), 200, "accepted");
+                assertNlp(send(a, endpoint, null), 200, "accepted");
+                var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
+                        a.get("correlation_id").asString());
+                localRead.result.set(diagnosis);
+                verifyDiagnosticHttp(diagnosis);
                 assertThat(owners.evidenceStore.register(eventB.input())).isEqualTo(Registration.CREATED);
 
                 scope.deniedRevisions.add(MEMBER_A_REVISION);
                 scope.queries.clear();
                 int membershipBeforeDenial = owners.membershipCalls.get();
-                var denied = send(b, endpoint, "Synthetic template");
+                var denied = send(b, endpoint, null);
                 assertNlp(denied, 422, "error");
                 assertThat(denied.get("kind").asString()).isEqualTo("permanent");
                 assertThat(scope.queries).extracting(query -> query.scopeRevision())
@@ -148,10 +187,10 @@ class FullOwnerChainTest {
                 assertThat(count("diagnosis.correlated_context_receipts")).isEqualTo(1);
 
                 scope.deniedRevisions.clear();
-                assertNlp(send(b, endpoint, "Synthetic template"), 200, "accepted");
+                assertNlp(send(b, endpoint, null), 200, "accepted");
                 createOrigin(c, eventC.binding());
                 assertThat(owners.evidenceStore.register(eventC.input())).isEqualTo(Registration.CREATED);
-                assertNlp(send(c, endpoint, "Synthetic template"), 200, "accepted");
+                assertNlp(send(c, endpoint, null), 200, "accepted");
                 assertNlp(send(a, endpoint, "Changed template on redelivery"), 200, "duplicate");
 
                 assertThat(count("evidence.correlation_groups")).isEqualTo(2);
@@ -171,6 +210,41 @@ class FullOwnerChainTest {
             }
         } finally {
             api.stop(0);
+        }
+    }
+
+    private HttpResponse<String> readDiagnosis(String token) throws Exception {
+        var request = HttpRequest.newBuilder(loopback(port).resolve(LocalDiagnosticEndpoint.PATH)).timeout(BUDGET);
+        if (token != null) request.header("Authorization", "Bearer " + token);
+        return HttpClient.newHttpClient().send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private void verifyDiagnosticHttp(Diagnosis diagnosis) throws Exception {
+        assertThat(readDiagnosis("invalid").statusCode()).isEqualTo(401);
+        var response = readDiagnosis(localRead.token);
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+        assertThat(JSON.readTree(response.body())).isEqualTo(JSON.valueToTree(diagnosis));
+        System.out.println("PIPESOR_DIAGNOSTIC_HTTP 401 503 200 verified for " + diagnosis.correlationId());
+        var browserCheck = System.getenv("PIPESOR_DEMO_BROWSER_CHECK");
+        if (browserCheck != null && !browserCheck.isBlank()) {
+            var log = Files.createTempFile("pipesor-browser-", ".log");
+            try {
+                var command = new ProcessBuilder("node", browserCheck)
+                        .redirectErrorStream(true).redirectOutput(log.toFile());
+                command.environment().put("PIPESOR_DEMO_PORT", Integer.toString(port));
+                command.environment().put("PIPESOR_DEMO_TOKEN", localRead.token);
+                var browser = command.start();
+                try {
+                    assertThat(browser.waitFor(60, TimeUnit.SECONDS)).as("Browser check finished").isTrue();
+                    System.out.print(Files.readString(log));
+                    assertThat(browser.exitValue()).as("Browser check status").isZero();
+                } finally {
+                    if (browser.isAlive()) browser.destroyForcibly();
+                }
+            } finally {
+                Files.deleteIfExists(log);
+            }
         }
     }
 
@@ -250,8 +324,10 @@ class FullOwnerChainTest {
         var process = command.start();
         try {
             try (var input = process.getOutputStream()) {
-                input.write(JSON.writeValueAsBytes(Map.of("body", body, "endpoint", endpoint.toString(), "template", template,
-                        "token", OwnerChain.token(OwnerChain.CORRELATION_AUDIENCE, OwnerChain.NLP_ROLE, true))));
+                var request = JSON.valueToTree(Map.of("body", body, "endpoint", endpoint.toString(),
+                        "token", OwnerChain.token(OwnerChain.CORRELATION_AUDIENCE, OwnerChain.NLP_ROLE, true)));
+                if (template != null) ((ObjectNode) request).put("template", template);
+                input.write(JSON.writeValueAsBytes(request));
             }
             assertThat(process.waitFor(40, TimeUnit.SECONDS)).as("NLP fixture finished").isTrue();
             assertThat(process.exitValue()).as("NLP fixture exit status").isZero();

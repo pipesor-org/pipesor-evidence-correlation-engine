@@ -3,9 +3,17 @@ set -euo pipefail
 
 correlation=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 peers=${1:-"$correlation/.."}
-python_bin=$("${PYTHON_BIN:-python3.14}" -c 'import drain3, sys; print(sys.executable)')
+python_bin=$("${PYTHON_BIN:-python3.14}" -c 'import drain3, uvicorn, sys; print(sys.executable)')
 fixture=$(mktemp -d /tmp/pipesor-owner-chain.XXXXXXXX)
-trap 'rm -rf -- "$fixture"' EXIT
+rag_pid=
+cleanup() {
+    if [[ -n "$rag_pid" ]]; then
+        kill "$rag_pid" 2>/dev/null || true
+        wait "$rag_pid" || true
+    fi
+    rm -rf -- "$fixture"
+}
+trap cleanup EXIT
 
 stage() {
     local peer=$1 revision
@@ -15,7 +23,7 @@ stage() {
     git -C "$peers/pipesor-$peer" archive "$revision" | tar -xf - -C "$fixture/$peer"
 }
 
-for peer in pipeline-service log-event-service recommendation-service nlp-log-processor; do
+for peer in pipeline-service log-event-service recommendation-service nlp-log-processor rag-retrieval; do
     stage "$peer"
 done
 
@@ -30,14 +38,33 @@ copy_peer() {
     cp "$project"/src/main/resources/db/migration/*.sql "$resources/$location/"
 }
 
+for diagnostic in diagnosis/application/DiagnosticOrchestrator.java diagnosis/interfaces/rest/LocalDiagnosticEndpoint.java; do
+    path="src/main/java/com/pipesor/recommendation/$diagnostic"
+    install -D "$peers/pipesor-recommendation-service/$path" "$fixture/recommendation-service/$path"
+    sha256sum "$fixture/recommendation-service/$path"
+done
 copy_peer "$correlation" correlation-migrations org
 copy_peer "$fixture/log-event-service" log-event-migrations org
 copy_peer "$fixture/recommendation-service" recommendation-migrations com
 
 cp "$fixture/log-event-service/src/test/resources/protected-workflow-evidence-v2.json" "$resources/"
-cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain}.java "$host/src/test/java/"
+cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis}.java "$host/src/test/java/"
+
+cp "$correlation/tools/local-handoff/checkout-failure.log" "$resources/"
+
+env -i PYTHONPATH="$fixture/rag-retrieval/src" "$python_bin" \
+    "$correlation/tools/local-handoff/serve_rag_fixture.py" \
+    "$resources/protected-workflow-evidence-v2.json" "$fixture/rag-port" &
+rag_pid=$!
+for attempt in {1..100}; do
+    [[ -s "$fixture/rag-port" ]] && break
+    kill -0 "$rag_pid"
+    sleep 0.1
+done
+rag_port=$(<"$fixture/rag-port")
 
 cd "$host"
 PYTHONPATH="$fixture/nlp-log-processor/src" ./mvnw -B -ntp -Dtest=FullOwnerChainTest \
+    "-Dpipesor.fixture.rag.port=$rag_port" \
     "-Dpipesor.fixture.python=$python_bin" \
     "-Dpipesor.fixture.nlp=$correlation/tools/local-handoff/send_nlp_fixture.py" test

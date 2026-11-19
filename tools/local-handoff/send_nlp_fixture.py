@@ -18,6 +18,7 @@ from pipesor_nlp_log_processor.infrastructure.correlation_http import (
     RetryPolicy,
     UrlLibHttpTransport,
 )
+from pipesor_nlp_log_processor.infrastructure.drain_parser import DrainLogParser
 from pipesor_nlp_log_processor.infrastructure.sanitizer import PatternLogSanitizer
 
 
@@ -79,7 +80,7 @@ def main():
         transport,
     )
     processor = ProcessLog(
-        FixtureParser(request.get("template", "Synthetic template")),
+        FixtureParser(request["template"]) if "template" in request else DrainLogParser(),
         PatternLogSanitizer(),
     )
     received = ReceivedMessage(
