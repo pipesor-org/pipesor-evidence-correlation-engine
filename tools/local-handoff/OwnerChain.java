@@ -155,6 +155,19 @@ public final class OwnerChain implements AutoCloseable {
         }
     }
 
+    public static String pilotToken(String tenant, String audience, String subject, String scope) {
+        try {
+            var claims = new JWTClaimsSet.Builder().issuer(ISSUER.toString()).audience(audience)
+                    .claim("tid", tenant).claim("oid", subject).claim("scp", scope)
+                    .expirationTime(Date.from(Instant.now().plusSeconds(300))).build();
+            var jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
+            jwt.sign(new RSASSASigner(KEYS.getPrivate()));
+            return jwt.serialize();
+        } catch (Exception failure) {
+            throw new IllegalStateException("Synthetic token signing failed", failure);
+        }
+    }
+
     private static KeyPair keys() {
         try {
             var generator = KeyPairGenerator.getInstance("RSA");

@@ -13,6 +13,8 @@ import org.pipesor.correlation.context.infrastructure.validation.OwnerChain;
 import org.pipesor.correlation.context.interfaces.rest.ProcessedEvidenceHttpHandler;
 import org.pipesor.logevent.evidence.application.ports.EvidenceStore.Registration;
 import org.pipesor.logevent.evidence.interfaces.messaging.ProtectedEvidenceV2;
+import org.pipesor.pipeline.GitHubConnectorDouble;
+import org.pipesor.pipeline.OperationalPilotIdentity;
 import org.pipesor.pipeline.PipelineServiceApplication;
 import org.pipesor.pipeline.PostgresTestConfiguration;
 import org.pipesor.pipeline.execution.application.commands.ExecutionSnapshot;
@@ -60,7 +62,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = PipelineServiceApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"spring.flyway.enabled=true", "server.address=127.0.0.1"})
-@Import({PostgresTestConfiguration.class, OwnerChain.Fixture.class, FullOwnerChainTest.ReceiptFixture.class})
+@Import({PostgresTestConfiguration.class, OwnerChain.Fixture.class, FullOwnerChainTest.ReceiptFixture.class, OperationalPilotIdentity.class})
 class FullOwnerChainTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Clock CLOCK = Clock.systemUTC();
@@ -76,6 +78,7 @@ class FullOwnerChainTest {
     @Autowired ExecutionSnapshotService snapshots;
     @Autowired OwnerChain.Scope scope;
     @Autowired LocalRead localRead;
+    @Autowired GitHubConnectorDouble github;
 
     @DynamicPropertySource
     static void settings(DynamicPropertyRegistry registry) {
@@ -178,6 +181,7 @@ class FullOwnerChainTest {
                 var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
                         a.get("correlation_id").asString(), localRead.reviewId::set);
                 localRead.result.set(diagnosis);
+                if ("E02".equals(System.getProperty("pipesor.fixture.scenario"))) verifyOperationalHttp(diagnosis, binding.githubRepositoryId());
                 verifyDiagnosticHttp(diagnosis);
                 assertThat(owners.evidenceStore.register(eventB.input())).isEqualTo(Registration.CREATED);
 
@@ -252,6 +256,10 @@ class FullOwnerChainTest {
                         .redirectErrorStream(true).redirectOutput(log.toFile());
                 command.environment().put("PIPESOR_DEMO_PORT", Integer.toString(port));
                 command.environment().put("PIPESOR_DEMO_TOKEN", localRead.token);
+                if ("E02".equals(System.getProperty("pipesor.fixture.scenario"))) {
+                    command.environment().put("PIPESOR_OPERATIONAL_TOKEN",
+                            OperationalPilotIdentity.token(OperationalPilotIdentity.TENANT));
+                }
                 if (reviewId != null) {
                     command.environment().put("PIPESOR_REVIEW_IDS", reviewId.toString());
                     command.environment().put("PIPESOR_REVIEW_TOKEN", localRead.token);
@@ -282,6 +290,32 @@ class FullOwnerChainTest {
         }
     }
 
+    private void verifyOperationalHttp(Diagnosis diagnosis, String repository) throws Exception {
+        var uri = loopback(port).resolve("/api/v1/incidents/" + diagnosis.incidentId());
+        var client = HttpClient.newHttpClient();
+        var valid = OperationalPilotIdentity.token(OperationalPilotIdentity.TENANT);
+        var request = HttpRequest.newBuilder(uri).header("Authorization", "Bearer " + valid).build();
+        var detail = client.send(request, HttpResponse.BodyHandlers.ofString());
+        assertThat(detail.statusCode()).isEqualTo(200);
+        assertThat(JSON.readTree(detail.body()).path("correlationId").asString()).isEqualTo(diagnosis.correlationId());
+        var wrongTenant = OperationalPilotIdentity.token(UUID.randomUUID().toString());
+        var wrong = HttpRequest.newBuilder(uri).header("Authorization", "Bearer " + wrongTenant).build();
+        assertThat(client.send(wrong, HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(401);
+        OperationalPilotIdentity.denyRepository(github, repository);
+        try {
+            assertThat(client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(403);
+        } finally {
+            OperationalPilotIdentity.grant(github, repository);
+        }
+        OperationalPilotIdentity.unavailable(github, true);
+        try {
+            assertThat(client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(503);
+        } finally {
+            OperationalPilotIdentity.unavailable(github, false);
+        }
+        System.out.println("PILOT_PIPELINE_HTTP persisted incident, cross-tenant 401, repository denial 403, authority outage 503");
+    }
+
     private void migrate(String schema, String history, String location) {
         // Log/Event and Correlation share the schema while owning separate migration histories.
         Flyway.configure().dataSource(source).defaultSchema(schema).table(history).locations("classpath:" + location)
@@ -297,6 +331,11 @@ class FullOwnerChainTest {
                     criticality, monitoring_status, created_at)
                 VALUES (?, ?, ?, 'Fixture workflow', 'fixture.yml', 'HIGH', 'ACTIVE', now())
                 """, binding.pipelineId(), repository, binding.githubWorkflowId());
+        var actor = OperationalPilotIdentity.grant(github, binding.githubRepositoryId());
+        jdbc.update("""
+                INSERT INTO ops.pipeline_access_grants (id, pipeline_id, principal_ref, capability, correlation_id, created_at)
+                VALUES (?, ?, ?, 'VIEW', 'operational-pilot', now())
+                """, UUID.randomUUID(), binding.pipelineId(), actor);
     }
 
     private void createOrigin(ObjectNode body, ProtectedEvidenceV2.Binding binding) {

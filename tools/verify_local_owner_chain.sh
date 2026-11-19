@@ -90,7 +90,7 @@ case "$scenario" in
     *) exit 2 ;;
 esac
 cp "$correlation/tools/local-handoff/$review_fixture/DemoReview.java" "$host/src/test/java/"
-cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis,FoundryDiagnosticFixture}.java "$host/src/test/java/"
+cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis,FoundryDiagnosticFixture,OperationalPilotIdentity}.java "$host/src/test/java/"
 
 rag_env=(PYTHONPATH="$fixture/rag-retrieval/src" PIPESOR_DEMO_SCENARIO="$scenario" PIPESOR_DEMO_RAG_MODE="$rag_mode")
 rag_server=serve_rag_fixture.py

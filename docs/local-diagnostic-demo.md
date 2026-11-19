@@ -190,3 +190,9 @@ from the source line, whether the output makes its uncertainty clear, and
 whether an evaluator can trace the diagnosis through the receipt.
 Managed model accuracy, retrieval relevance on an authorized corpus and
 production readiness remain unverified.
+
+### Operational discovery in the E02 review run
+
+With the frontend's operational-pilot verifier, the E02 owner-chain fixture exercises Pipeline's existing delegated HTTP reads. Its test-only identity uses the real Pipeline JWT claim validator and a signed local token, a seeded VIEW grant, and the existing explicit GitHub facts double. Chromium discovers the incident from Operations and reloads the operational Workspace without a harness-supplied incident or diagnostic identifier. Look for `PILOT_PIPELINE_HTTP` and `PILOT_CHROMIUM`.
+
+The existing review check remains a separate scoped diagnostic-ID path. PD-011/034 still need the authorized product association and query contract. No Pipeline or Recommendation production configuration is changed.
