@@ -16,16 +16,18 @@ cleanup() {
 trap cleanup EXIT
 
 stage() {
-    local peer=$1 revision
-    revision=$(git -C "$peers/pipesor-$peer" rev-parse --verify 'main^{commit}')
+    local peer=$1 ref=$2 revision
+    revision=$(git -C "$peers/pipesor-$peer" rev-parse --verify "${ref}^{commit}")
     printf '%s fixture revision %s\n' "$peer" "$revision"
     mkdir -p "$fixture/$peer"
     git -C "$peers/pipesor-$peer" archive "$revision" | tar -xf - -C "$fixture/$peer"
 }
 
-for peer in pipeline-service log-event-service recommendation-service nlp-log-processor rag-retrieval; do
-    stage "$peer"
+for peer in pipeline-service log-event-service nlp-log-processor; do
+    stage "$peer" main
 done
+stage recommendation-service "${PIPESOR_DEMO_RECOMMENDATION_REF:-main}"
+stage rag-retrieval "${PIPESOR_DEMO_RAG_REF:-main}"
 
 host="$fixture/pipeline-service"
 resources="$host/src/test/resources"
@@ -38,11 +40,6 @@ copy_peer() {
     cp "$project"/src/main/resources/db/migration/*.sql "$resources/$location/"
 }
 
-for diagnostic in diagnosis/application/DiagnosticOrchestrator.java diagnosis/interfaces/rest/LocalDiagnosticEndpoint.java; do
-    path="src/main/java/com/pipesor/recommendation/$diagnostic"
-    install -D "$peers/pipesor-recommendation-service/$path" "$fixture/recommendation-service/$path"
-    sha256sum "$fixture/recommendation-service/$path"
-done
 copy_peer "$correlation" correlation-migrations org
 copy_peer "$fixture/log-event-service" log-event-migrations org
 copy_peer "$fixture/recommendation-service" recommendation-migrations com

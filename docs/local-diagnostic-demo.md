@@ -4,8 +4,7 @@
 
 From the directory containing the sibling service checkouts, use Java 25,
 Docker with Testcontainers access, and Python 3.14 with the NLP and RAG projects' pinned
-dependencies installed. This demo also needs the companion Recommendation
-orchestration change in its checkout.
+dependencies installed.
 
 ```bash
 python3.14 -m venv /tmp/pipesor-demo-nlp
@@ -15,9 +14,10 @@ set -o pipefail
 bash pipesor-evidence-correlation-engine/tools/verify_local_owner_chain.sh 2>&1 | tee /tmp/pipesor-diagnostic-demo.log
 ```
 
-The runner stages local `main` revisions of Pipeline, Log/Event, NLP, RAG
-and Recommendation and prints their commit IDs. It overlays the Recommendation orchestrator and local read route from the sibling
-checkout and prints their SHA-256 hashes.
+The runner archives committed local `main` revisions of Pipeline, Log/Event,
+NLP, RAG and Recommendation and prints their commit IDs. Set
+`PIPESOR_DEMO_RECOMMENDATION_REF` or `PIPESOR_DEMO_RAG_REF` to test a different
+committed revision of either service.
 Correlation builds from the current checkout. Maven and Docker may need to
 download dependencies and images on the first run. PostgreSQL 17.11 is disposable.
 
