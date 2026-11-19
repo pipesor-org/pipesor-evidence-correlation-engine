@@ -49,14 +49,17 @@ final class DemoDiagnosis {
         assertThat(evidence.evidenceId()).isEqualTo(expectedEvidence);
         assertThat(evidence.originContextId()).isEqualTo(context);
         var scenario = System.getProperty("pipesor.fixture.scenario", "local-checkout-dns");
+        boolean external = "external".equals(scenario);
         boolean dependency = "E02".equals(scenario);
         boolean ambiguous = "E03".equals(scenario);
-        assertThat(evidence.stage()).isEqualTo(dependency || ambiguous ? "BUILD" : "INFRASTRUCTURE");
-        assertThat(evidence.content()).contains(switch (scenario) {
-            case "E02" -> "Could not find org.example:fixture-lib:9.9.9";
-            case "E03" -> "Build step exited with code 1; diagnostic output unavailable";
-            default -> "Could not resolve host: git.example.invalid";
-        });
+        if (!external) {
+            assertThat(evidence.stage()).isEqualTo(dependency || ambiguous ? "BUILD" : "INFRASTRUCTURE");
+            assertThat(evidence.content()).contains(switch (scenario) {
+                case "E02" -> "Could not find org.example:fixture-lib:9.9.9";
+                case "E03" -> "Build step exited with code 1; diagnostic output unavailable";
+                default -> "Could not resolve host: git.example.invalid";
+            });
+        }
         assertThat(receipt.get("correlation_id")).isEqualTo(correlation);
         assertThat(signal.get("correlation_id").asString()).isEqualTo(correlation);
 
@@ -88,7 +91,7 @@ final class DemoDiagnosis {
         boolean foundry = "foundry".equals(System.getProperty("pipesor.fixture.llm.mode"));
         Inference managed = foundry ? FoundryDiagnosticFixture.create() : null;
         Inference inference = foundry ? (observed, knowledge) -> {
-            if (dependency || ambiguous) {
+            if (dependency || ambiguous || external) {
                 assertThat(knowledge).hasSize(ambiguous ? 0 : 1);
                 System.out.println("PIPESOR_MODEL_INPUT " + JSON.writeValueAsString(knowledge.stream()
                         .map(chunk -> chunk.chunkId()).toList()));
@@ -96,6 +99,12 @@ final class DemoDiagnosis {
             return managed.infer(observed, knowledge);
         } : (observed, knowledge) -> {
             var line = observed.getFirst();
+            if (external) {
+                assertThat(knowledge).hasSize(1);
+                return new Hypothesis("Observed failure: " + line.content(), knowledge.getFirst().content(),
+                        "The excerpt alone does not establish an upstream cause.",
+                        List.of(line.evidenceId()), List.of(knowledge.getFirst().chunkId()));
+            }
             if (dependency || ambiguous) {
                 assertThat(knowledge).hasSize(ambiguous ? 0 : 1);
                 return new Hypothesis(
@@ -117,7 +126,7 @@ final class DemoDiagnosis {
         };
         var service = new DiagnosticOrchestrator(rag, inference);
         var output = service.diagnose(context, execution, incident, query, List.of(evidence));
-        if (foundry && (dependency || ambiguous)) {
+        if (foundry && (dependency || ambiguous || external)) {
             System.out.println("PIPESOR_FOUNDRY_VALIDATION accepted evidence and citation contract");
             System.out.println("PIPESOR_VALIDATED_OUTPUT " + JSON.writeValueAsString(output));
         }
@@ -125,16 +134,16 @@ final class DemoDiagnosis {
         if (ambiguous) {
             assertThat(output.sources()).isEmpty();
             assertThat(output.hypothesis().chunkIds()).isEmpty();
-        } else if (dependency || hybrid) {
+        } else if (dependency || hybrid || external) {
             assertThat(output.sources()).singleElement().satisfies(source ->
                     assertThat(source.provenance()).isEqualTo(
-                            "synthetic://pipesor/local-dev/" + (dependency ? "dependency-index" : "runner-connectivity") + "/v1#chunk=0"));
+                            "synthetic://pipesor/local-dev/" + (external ? "failure-triage" : dependency ? "dependency-index" : "runner-connectivity") + "/v1#chunk=0"));
         } else {
             assertThat(output.sources()).containsExactly(
                     new DiagnosticOrchestrator.Source(DOCUMENT, CHUNK, "fixture:runner-network-checks"));
         }
         assertThat(output.correlationId()).isEqualTo(correlation);
-        if (foundry && !dependency && !ambiguous) {
+        if (foundry && !dependency && !ambiguous && !external) {
             assertThat(output.hypothesis().probableCause()).isNotBlank();
             System.out.println("PIPESOR_FOUNDRY_VALIDATION matched: accepted evidence and RAG citations");
             // Each call reserves up to 1024 output tokens on a 2,000 TPM deployment.
@@ -153,7 +162,7 @@ final class DemoDiagnosis {
             System.out.println("PIPESOR_FOUNDRY_VALIDATION no-match: accepted evidence-only diagnosis");
         } else {
             assertThat(output.hypothesis().evidenceIds()).containsExactly(expectedEvidence);
-            if (!foundry) assertThat(output.hypothesis().probableCause()).contains(
+            if (!foundry && !external) assertThat(output.hypothesis().probableCause()).contains(
                     ambiguous ? "cannot be determined" : dependency ? "org.example:fixture-lib:9.9.9" : "could not resolve");
         }
 
