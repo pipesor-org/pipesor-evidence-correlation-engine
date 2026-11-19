@@ -267,13 +267,14 @@ class FullOwnerChainTest {
 
     private void createOrigin(ObjectNode body, ProtectedEvidenceV2.Binding binding) {
         var at = binding.occurredAt();
+        var stage = PipelineStage.valueOf(body.at("/evidence/stage").asString());
         var snapshot = new ExecutionSnapshot("1.0", UUID.randomUUID(), "execution.snapshot", "github_actions",
                 at, binding.sourceUpdatedAt(), body.get("correlation_id").asString(),
                 new ExecutionSnapshot.Pipeline(binding.githubRepositoryId(), binding.githubWorkflowId()),
                 new ExecutionSnapshot.Execution(binding.githubRunId(), binding.runAttempt(), "main", "completed", "failure", at, at),
                 new ExecutionSnapshot.Commit(binding.commitSha()), null, null,
-                List.of(new ExecutionSnapshot.Stage(PipelineStage.INFRASTRUCTURE, "completed", at, at)),
-                new ExecutionSnapshot.Failure(PipelineStage.INFRASTRUCTURE, "Synthetic fixture failure", at));
+                List.of(new ExecutionSnapshot.Stage(stage, "completed", at, at)),
+                new ExecutionSnapshot.Failure(stage, "Synthetic fixture failure", at));
         assertThat(snapshots.handle(new ExecutionSnapshotTransformer().fromJson(JSON.writeValueAsString(snapshot))))
                 .isEqualTo("APPLIED");
     }

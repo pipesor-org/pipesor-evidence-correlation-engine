@@ -1,0 +1,353 @@
+{
+  "version": "1.1.0",
+  "manuscript": {
+    "title": "Pipesor: arquitectura AIOps con trazabilidad de evidencia para el diagnóstico asistido de fallos CI/CD",
+    "version": "1.2",
+    "section": "3.3, Propiedades verificables, p. 4",
+    "provenance": "Verbatim definitions supplied by the author in the working conversation; PDF not locally mounted.",
+    "properties": {
+      "P1": "cada diagnóstico puede reconstruirse a partir de su ejecución, evidencia y fuentes",
+      "P2": "una consulta RAG no obtiene fragmentos fuera del alcance autorizado",
+      "P3": "la revisión humana distingue hipótesis generada de diagnóstico confirmado, corregido o rechazado"
+    }
+  },
+  "source": {
+    "workbook_url": "https://raw.githubusercontent.com/zhengly1/workflow_failure/b1d2107c716368aeeec6648317fba23273f16f6a/replication-labeling.xlsx",
+    "workbook_sha256": "39647c82583a2039b69fcf57fa30808d46f9bbf3cbcf6caf023921c2588de860",
+    "worksheet": "xl/worksheets/sheet1.xml",
+    "row_columns": [
+      "A",
+      "B",
+      "F",
+      "G",
+      "H",
+      "I",
+      "J"
+    ],
+    "row_encoding": "UTF-8 compact JSON array of exact cell values, ensure_ascii=false, no trailing newline",
+    "rights": "Public workbook; no license identified in the pinned GitHub repository. Candidate references and cause paraphrases only. Reuse of raw logs or redistribution requires separate review."
+  },
+  "common_controls": {
+    "normalization": "After access and rights checks, freeze raw bytes privately, then derive a minimal masked excerpt. Assign stable synthetic scoped tenant/account/installation/repository/workflow/run/attempt IDs and line anchors. Map to existing protected-workflow-evidence v2 and processed-evidence path. Never guess missing incident/job boundaries.",
+    "rag": "Use a separately authorized generic runbook under the exact synthetic tenant, installation, repository, pipeline and scope revision. Hold workbook, labels, incident excerpts, evaluation questions and reference solutions outside the importer and every prompt. Where no generic source is approved, expect no-match.",
+    "acceptance": {
+      "P1": "Reconstruct the scoped execution, masked source line, committed receipt and cited chunk provenance. Reject missing and unsupported citations and abstain when evidence is insufficient.",
+      "P2": "Authorized query returns only permitted chunks; wrong scope yields no matches; wrong caller is denied. No-match may support an evidence-only diagnosis.",
+      "P3": "Pending until an actual authorized reviewer confirms, corrects or rejects and a persistent attributable transition is verified. A displayed hypothesis only demonstrates presentation."
+    },
+    "artifacts": [
+      "immutable raw digest without raw content in Git",
+      "masked excerpt and digest",
+      "sanitization report and source-line mapping",
+      "normalized envelope and scoped identity mapping",
+      "correlation and Recommendation receipt with commit refs",
+      "RAG result or no-match and authorization test",
+      "sanitized diagnosis with citation IDs or controlled failure",
+      "runtime/version/mode results and artifact hashes",
+      "human-review evidence only if actually available"
+    ],
+    "failure_reporting": "Record planned, blocked, failed or passed per case. An unavailable log, incomplete rights review, missing checksum, missing evidence, invalid citation, cross-scope disclosure, or missing required artifact cannot count as a pass. Keep first safe error/stage and rerun provenance; avoid silently substituting a synthetic incident."
+  },
+  "baseline": {
+    "id": "local-checkout-dns",
+    "status": "runnable",
+    "mode": "deterministic",
+    "checkout_log_sha256": "d69589c5a6b44c294cc487050a29b9d3f6013902e11a6b8da292faec300e7bc9",
+    "envelope_sha256": "d9e05ca3e5401ff9455e09522802ae9f9f67a43143c5ebcfb2c417d8002461b8",
+    "refs": {
+      "pipeline": "0f9b440db958794fc2be2da485c20ecc61d47099",
+      "log_event": "6f4dfa8c2f4176449c8290bc307b46527251b7b1",
+      "nlp": "92fea50081f0e1150c8ae9a78d9c5e162b7e0611",
+      "recommendation": "aa8ce3b",
+      "rag": "1772c18e2b31d228ee05a82a2b145827930baebd"
+    }
+  },
+  "candidates": [
+    {
+      "id": "unit-test-failure",
+      "status": "planned",
+      "source_row": 2,
+      "dataset_job_id": "18",
+      "job_url": "https://Github.com/xnio/xnio/actions/runs/5924114740/job/16061084523",
+      "row_sha256": "dba3fbf9a57b1878420678aa37109836326830d5fd1827e33c44e4dd335350b9",
+      "workbook_label_tag": "P8",
+      "original_step": "Run Tests",
+      "reference_cause": "A unit test assertion failed in Maven",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "No exact assertion or upstream code defect was independently checked.",
+      "log_selector": "Test summary and first failing assertion; omit stack lines containing account data.",
+      "raw_log_sha256": null,
+      "sanitization": "Retain the failing test identifier as a stable alias and distinguish assertion from test infrastructure.",
+      "normalization_stage": "TESTING",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Type assertion failure; cite the failing suite without claiming the underlying code defect.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "compiler-source-error",
+      "status": "planned",
+      "source_row": 7,
+      "dataset_job_id": "217",
+      "job_url": "https://Github.com/playframework/play1/actions/runs/6196023342/job/16821861859",
+      "row_sha256": "4666a238cd5d22da61346f9a4bbc30b92ec985ee9bd8e4e3297fd18be2840bd5",
+      "workbook_label_tag": "P1",
+      "original_step": "Build with Ant",
+      "reference_cause": "Ant stopped on a source compilation error",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "The compiler message and offending source line are unavailable here.",
+      "log_selector": "First compiler diagnostic and matching Ant task exit; omit source contents.",
+      "raw_log_sha256": null,
+      "sanitization": "Mask local paths and class names while preserving file and line relationships.",
+      "normalization_stage": "BUILD",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Distinguish the compiler failure from the final Ant exit and cite the compiler diagnostic.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "setup-package-unavailable",
+      "status": "planned",
+      "source_row": 12,
+      "dataset_job_id": "344",
+      "job_url": "https://Github.com/previousalone/nnngram/actions/runs/6355916409/job/17264752146",
+      "row_sha256": "d0b1cfe0c501e25cbb808844c4c57c10fd5440487c6691290ced5e7a016079b3",
+      "workbook_label_tag": "W4",
+      "original_step": "Prepare Environment",
+      "reference_cause": "Environment preparation could not locate a dependency package",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "Package absence versus registry access or an incorrect index was not independently resolved.",
+      "log_selector": "Package resolver failure and environment setup output; omit registry config.",
+      "raw_log_sha256": null,
+      "sanitization": "Mask registry host, package identifiers and any embedded credentials, preserving resolver status.",
+      "normalization_stage": "INFRASTRUCTURE",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Attribute the failure to setup dependency lookup; avoid asserting why the package was absent.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "git-merge-conflict",
+      "status": "planned",
+      "source_row": 22,
+      "dataset_job_id": "706",
+      "job_url": "https://Github.com/corretto/corretto-8/actions/runs/6822224027/job/18553911946",
+      "row_sha256": "58b7fdc80c2c3cf943b46250a16f9ef980fe7cecdc36c82df7cab2e50b3c8a6b",
+      "workbook_label_tag": "W8",
+      "original_step": "Merge Corretto-8",
+      "reference_cause": "A synchronization push failed due to a merge conflict",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "Selected stage is provisional until the actual workflow context confirms release/synchronization; otherwise map to INFRASTRUCTURE.",
+      "log_selector": "Merge/conflict markers and push step failure; omit file contents.",
+      "raw_log_sha256": null,
+      "sanitization": "Alias branches, paths and remotes without losing the relationship between merge and failed push.",
+      "normalization_stage": "DEPLOYMENT",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Separate the reported conflict from a push authorization error and keep the stage provisional until intake evidence supports it.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "coverage-threshold",
+      "status": "planned",
+      "source_row": 51,
+      "dataset_job_id": "2022",
+      "job_url": "https://Github.com/zalando/logbook/actions/runs/6837892949/job/18594402544",
+      "row_sha256": "9786b06f0ea07a44e40f25a1ee2314a9a874e4fffc9485c35ed919377985a779",
+      "workbook_label_tag": "P5",
+      "original_step": "Test",
+      "reference_cause": "The Maven job failed its coverage check",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "The annotation does not establish the threshold, scope or magnitude of the shortfall.",
+      "log_selector": "Coverage summary, target threshold and gate failure; omit report dumps.",
+      "raw_log_sha256": null,
+      "sanitization": "Remove project identifiers and report URLs; keep percentages if safe and observed.",
+      "normalization_stage": "QUALITY_GATE",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Distinguish a failed coverage check from unit-test failure; quote no metric absent from evidence.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "github-rate-limit",
+      "status": "planned",
+      "source_row": 76,
+      "dataset_job_id": "3279",
+      "job_url": "https://Github.com/awslabs/aws-advanced-jdbc-wrapper/actions/runs/6837780934/job/18594173106",
+      "row_sha256": "73a888237ca86f5c3fa8376da55b25c0d9b93c4fd3e894b7d5d084de8ac6c156",
+      "workbook_label_tag": "W7",
+      "original_step": "Remove Old Artifacts",
+      "reference_cause": "Artifact maintenance hit GitHub API rate limiting",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "Primary versus secondary limit and initiating traffic were not independently verified.",
+      "log_selector": "Relevant API status and rate-limit message; omit headers other than safe rate-limit fields.",
+      "raw_log_sha256": null,
+      "sanitization": "Remove authorization, request URLs, account IDs and reset timestamps if identifying.",
+      "normalization_stage": "INFRASTRUCTURE",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Distinguish throttling from a generic 403 and avoid attributing it to a particular account.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "cluster-build-connectivity",
+      "status": "planned",
+      "source_row": 119,
+      "dataset_job_id": "5113",
+      "job_url": "https://Github.com/aws-containers/retail-store-sample-app/actions/runs/6723607295/job/18274043718",
+      "row_sha256": "85aac625bb4ad8bda876db12ad8b606f8a1a1a61df45747c6d825b5e169856fa",
+      "workbook_label_tag": "W3",
+      "original_step": "Create k8s Kind Cluster",
+      "reference_cause": "A connection problem interrupted Docker/Kind cluster creation",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "The affected peer and DNS versus TCP versus TLS are not established.",
+      "log_selector": "Container pull or cluster failure neighborhood and first connection error; omit command dumps.",
+      "raw_log_sha256": null,
+      "sanitization": "Mask registry/endpoint URLs, image names, paths and tokens, preserving the connection-error class.",
+      "normalization_stage": "CONTAINER",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Cite the observed connectivity failure and preserve uncertainty about its layer.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "action-version-resolution",
+      "status": "planned",
+      "source_row": 135,
+      "dataset_job_id": "5801",
+      "job_url": "https://Github.com/spotify/missinglink/actions/runs/6296482729/job/17091557253",
+      "row_sha256": "3c6c645c6e60553b9cc9f3fa3817cdc378c828ecf299e2bd7a857b94ab25d05f",
+      "workbook_label_tag": "W6",
+      "original_step": "Set up job",
+      "reference_cause": "Job setup could not resolve the referenced action version",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "Specific bad tag or access cause not verified; keep blocked if the intake has no safely representable evidence.",
+      "log_selector": "Runner setup or annotation for action resolution; a step log may never have been emitted.",
+      "raw_log_sha256": null,
+      "sanitization": "Alias action repository and commit/tag while retaining the failure relationship.",
+      "normalization_stage": "INFRASTRUCTURE",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Never fabricate step logs for a pre-step failure; classify only if runner evidence supports it.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "workflow-permission-denied",
+      "status": "planned",
+      "source_row": 145,
+      "dataset_job_id": "6296",
+      "job_url": "https://Github.com/TongchengOpenSource/smart-doc/actions/runs/6528214404/job/17724088973",
+      "row_sha256": "bd972d3242de55819a19b7f53148bbb92f97facfdbc3b7ec52a3545ed0f9a9b5",
+      "workbook_label_tag": "W5",
+      "original_step": "Update Dependency graph",
+      "reference_cause": "Workflow permission denied a dependency graph update",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "Exact permission scope and whether policy versus token caused denial are unknown.",
+      "log_selector": "API operation and denied status/error; omit bodies and authorization headers.",
+      "raw_log_sha256": null,
+      "sanitization": "Remove tokens, actor and repository IDs, signed URLs and permission payloads.",
+      "normalization_stage": "INFRASTRUCTURE",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Separate authorization denial from throttling without proposing a broad permission grant.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    },
+    {
+      "id": "container-disk-exhaustion",
+      "status": "planned",
+      "source_row": 163,
+      "dataset_job_id": "7113",
+      "job_url": "https://Github.com/quarkusio/quarkus-images/actions/runs/6520792390/job/17708710967",
+      "row_sha256": "85d93aa6b431a50f9b04f31bc7f2b9547598a8e3999ea74d54b13d409575fdab",
+      "workbook_label_tag": "W1",
+      "original_step": "Build images",
+      "reference_cause": "Docker image build ran out of available storage",
+      "reference_confidence": "Independent author annotation; moderate for failure class, no local raw-log adjudication.",
+      "limitations": "The exhausted mount, allocation and contributing files were not independently checked.",
+      "log_selector": "First storage exhaustion error, image build step and safe capacity context.",
+      "raw_log_sha256": null,
+      "sanitization": "Mask image names, layers and filesystem paths; retain explicit ENOSPC or error text class.",
+      "normalization_stage": "CONTAINER",
+      "correlation_key": "synthetic scoped repository/workflow/run/attempt with step/event sequence",
+      "rag_policy": "Inherited authorized generic guidance or explicit no-match; keep this reference cause out of corpus and prompts.",
+      "acceptance": "Cite storage exhaustion and avoid assuming memory pressure, quota size or a specific mount.",
+      "artifacts": "Inherit common evidence inventory; no raw text, unpublished identifiers or answer labels in execution outputs.",
+      "planned_modes": [
+        "deterministic integration",
+        "separate budget and scope approval for managed inference"
+      ]
+    }
+  ],
+  "synthetic_scenarios": [
+    {
+      "id": "E02",
+      "status": "defined",
+      "source": "Self-authored synthetic GitHub Actions log and protected evidence envelope",
+      "generation": "Author a BUILD failure from a declared offline index inventory and a request for a different version. The index and resolver are represented by the synthetic fixture.",
+      "reference_cause": "The requested fictional dependency version 9.9.9 is absent from the controlled offline index containing only 1.0.0.",
+      "expected": "Identify the unresolved coordinate and cite the normalized failure plus generic authorized documentation.",
+      "normalization_stage": "BUILD",
+      "scope": "Synthetic tenant, installation, repository, canonical pipeline and scope-rev-12 from envelope",
+      "sanitization": "Fictional IDs and package coordinates; no external log, secret or personal data",
+      "rag": "Authorized generic dependency-index guide",
+      "log": "tools/preliminary/fixtures/E02.log",
+      "checkout_log_sha256": "8be9ac6e31ebd35e379279ef4d62f42f81c56712456ff4364386955dd1b8ec82",
+      "envelope": "tools/preliminary/fixtures/E02.json",
+      "envelope_sha256": "2ac4abc7dd7b04944a5f5d259340f28cf2d2fca2dc6f120004ac377a3ddfb34c",
+      "real_inference": "pending authorization and budget"
+    },
+    {
+      "id": "E03",
+      "status": "defined",
+      "source": "Self-authored synthetic GitHub Actions log and protected evidence envelope",
+      "generation": "Author a BUILD failure that retains the exit code and omits the command, stderr and causal details.",
+      "reference_cause": "Undetermined by design. Only an exit status is supplied; no hidden root-cause label exists.",
+      "expected": "Report that the available evidence cannot distinguish a cause, cite the exit-status evidence, and return no RAG citations.",
+      "normalization_stage": "BUILD",
+      "scope": "Synthetic tenant, installation, repository, canonical pipeline and scope-rev-12 from envelope",
+      "sanitization": "Fictional IDs and package coordinates; no external log, secret or personal data",
+      "rag": "Empty authorized scope; generic guide seeded only in a different scope",
+      "log": "tools/preliminary/fixtures/E03.log",
+      "checkout_log_sha256": "e6adbad7741329d5129ff9e1df7311cdb5537dd5ab96064c5d3c395f0f96852d",
+      "envelope": "tools/preliminary/fixtures/E03.json",
+      "envelope_sha256": "df88461773341a1be4346f46ce79a4d4998b874750baedc17f0e5f2e52d13730",
+      "real_inference": "pending authorization and budget"
+    }
+  ]
+}
