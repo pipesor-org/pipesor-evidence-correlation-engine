@@ -4,6 +4,8 @@ import com.pipesor.recommendation.diagnosis.application.DiagnosticOrchestrator;
 import com.pipesor.recommendation.diagnosis.application.DiagnosticOrchestrator.Diagnosis;
 import com.pipesor.recommendation.diagnosis.application.DiagnosticOrchestrator.Evidence;
 import com.pipesor.recommendation.diagnosis.application.DiagnosticOrchestrator.Hypothesis;
+import com.pipesor.recommendation.diagnosis.application.DiagnosticOrchestrator.Inference;
+import com.pipesor.recommendation.diagnosis.infrastructure.FoundryDiagnosticFixture;
 import com.pipesor.recommendation.retrieval.application.ports.RagUnavailableException;
 import com.pipesor.recommendation.retrieval.domain.AuthorizationScope;
 import com.pipesor.recommendation.retrieval.domain.CorpusKind;
@@ -74,22 +76,51 @@ final class DemoDiagnosis {
         var properties = new RagClientProperties(URI.create("https://rag.demo.invalid"),
                 "api://11111111-1111-1111-1111-111111111111", Duration.ofSeconds(5));
         var rag = new RestRagKnowledgeRetriever(builder, properties, () -> "synthetic-rag-token");
-        var service = new DiagnosticOrchestrator(rag, (observed, knowledge) -> {
+        boolean hybrid = "hybrid".equals(System.getProperty("pipesor.fixture.rag.mode"));
+        boolean foundry = "foundry".equals(System.getProperty("pipesor.fixture.llm.mode"));
+        Inference inference = foundry ? FoundryDiagnosticFixture.create() : (observed, knowledge) -> {
             var line = observed.getFirst();
             if (!line.content().contains("Could not resolve host:") || knowledge.size() != 1) {
                 throw new IllegalStateException("Synthetic inference fixture did not match");
             }
             return new Hypothesis("The checkout runner could not resolve the Git remote hostname.",
                     knowledge.getFirst().content(),
-                    "Simulated inference and embeddings. The reason name resolution failed remains unknown.",
+                    (hybrid ? "Deterministic local inference; managed embeddings. " : "Simulated inference and embeddings. ")
+                            + "The reason name resolution failed remains unknown.",
                     List.of(line.evidenceId()), List.of(knowledge.getFirst().chunkId()));
-        });
+        };
+        var service = new DiagnosticOrchestrator(rag, inference);
         var output = service.diagnose(context, execution, incident, query, List.of(evidence));
         assertThat(output.evidence()).containsExactly(evidence);
-        assertThat(output.sources()).containsExactly(
-                new DiagnosticOrchestrator.Source(DOCUMENT, CHUNK, "fixture:runner-network-checks"));
+        if (hybrid) {
+            assertThat(output.sources()).singleElement().satisfies(source ->
+                    assertThat(source.provenance()).isEqualTo(
+                            "synthetic://pipesor/local-dev/runner-connectivity/v1#chunk=0"));
+        } else {
+            assertThat(output.sources()).containsExactly(
+                    new DiagnosticOrchestrator.Source(DOCUMENT, CHUNK, "fixture:runner-network-checks"));
+        }
         assertThat(output.correlationId()).isEqualTo(correlation);
-        assertThat(output.hypothesis().probableCause()).contains("could not resolve");
+        if (foundry) {
+            assertThat(output.hypothesis().probableCause()).isNotBlank();
+            System.out.println("PIPESOR_FOUNDRY_VALIDATION matched: accepted evidence and RAG citations");
+            // Each call reserves up to 1024 output tokens on a 2,000 TPM deployment.
+            try {
+                Thread.sleep(Duration.ofSeconds(61));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Foundry quota wait interrupted");
+            }
+            var unmatched = new RetrievalQuery(correlation, query.query(), scope,
+                    List.of(CorpusKind.AUTHORIZED_RESPONSE_PROCEDURES), 1);
+            var noKnowledge = service.diagnose(context, execution, incident, unmatched, List.of(evidence));
+            assertThat(noKnowledge.evidence()).containsExactly(evidence);
+            assertThat(noKnowledge.hypothesis().chunkIds()).isEmpty();
+            assertThat(noKnowledge.sources()).isEmpty();
+            System.out.println("PIPESOR_FOUNDRY_VALIDATION no-match: accepted evidence-only diagnosis");
+        } else {
+            assertThat(output.hypothesis().probableCause()).contains("could not resolve");
+        }
 
         var noMatch = new RetrievalResult.NoMatch(correlation);
         assertRejected(new DiagnosticOrchestrator(ignored -> noMatch, (signalsIn, knowledge) -> null),
