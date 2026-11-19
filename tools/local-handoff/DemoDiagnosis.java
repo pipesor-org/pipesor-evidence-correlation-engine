@@ -31,7 +31,8 @@ final class DemoDiagnosis {
     private static final UUID CHUNK = UUID.fromString("44444444-4444-4444-4444-444444444444");
     private static final UUID DOCUMENT = UUID.fromString("55555555-5555-5555-5555-555555555555");
 
-    static Diagnosis verify(JdbcTemplate jdbc, UUID execution, UUID expectedEvidence, String correlation) {
+    static Diagnosis verify(JdbcTemplate jdbc, UUID execution, UUID expectedEvidence, String correlation,
+            java.util.function.Consumer<UUID> publishReviewId) throws java.sql.SQLException {
         // shortcut: test-only reconstruction from the owned receipt, replace with the approved PD-011 query.
         var receipt = jdbc.queryForMap("""
                 SELECT operation_id, incident_id, tenant_id, github_installation_id, github_repository_id,
@@ -125,7 +126,8 @@ final class DemoDiagnosis {
                     List.of(line.evidenceId()), List.of(knowledge.getFirst().chunkId()));
         };
         var service = new DiagnosticOrchestrator(rag, inference);
-        var output = service.diagnose(context, execution, incident, query, List.of(evidence));
+        var output = DemoReview.diagnose(jdbc.getDataSource(), service, context, execution, incident, query,
+                List.of(evidence), publishReviewId);
         if (foundry && (dependency || ambiguous || external)) {
             System.out.println("PIPESOR_FOUNDRY_VALIDATION accepted evidence and citation contract");
             System.out.println("PIPESOR_VALIDATED_OUTPUT " + JSON.writeValueAsString(output));

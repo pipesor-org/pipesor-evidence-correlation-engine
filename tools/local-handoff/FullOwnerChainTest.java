@@ -83,6 +83,7 @@ class FullOwnerChainTest {
     }
 
     static final class LocalRead {
+        final AtomicReference<UUID> reviewId = new AtomicReference<>();
         final AtomicReference<Diagnosis> result = new AtomicReference<>();
         final String token;
 
@@ -98,7 +99,8 @@ class FullOwnerChainTest {
         @Bean @Order(1)
         SecurityFilterChain fixtureReceiptSecurity(HttpSecurity http) throws Exception {
             // The test-only route delegates caller decisions to the actual receipt endpoint.
-            return http.securityMatcher("/internal/v1/correlated-contexts", LocalDiagnosticEndpoint.PATH)
+            return http.securityMatcher("/internal/v1/correlated-contexts", LocalDiagnosticEndpoint.PATH,
+                            "/local-demo/v1/diagnoses/*/review")
                     .csrf(csrf -> csrf.disable()).authorizeHttpRequests(r -> r.anyRequest().permitAll()).build();
         }
 
@@ -107,6 +109,11 @@ class FullOwnerChainTest {
         @Bean
         RouterFunction<ServerResponse> fixtureDiagnosticRoute(LocalRead read) {
             return LocalDiagnosticEndpoint.routes(read.token, read.result::get);
+        }
+
+        @Bean
+        RouterFunction<ServerResponse> fixtureReviewRoute(DataSource source, LocalRead read) {
+            return DemoReview.routes(source, read.token);
         }
 
         @Bean
@@ -169,7 +176,7 @@ class FullOwnerChainTest {
                 assertThat(owners.evidenceStore.register(eventA.input())).isEqualTo(Registration.CREATED);
                 assertNlp(send(a, endpoint, null), 200, "accepted");
                 var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
-                        a.get("correlation_id").asString());
+                        a.get("correlation_id").asString(), localRead.reviewId::set);
                 localRead.result.set(diagnosis);
                 verifyDiagnosticHttp(diagnosis);
                 assertThat(owners.evidenceStore.register(eventB.input())).isEqualTo(Registration.CREATED);
@@ -226,6 +233,17 @@ class FullOwnerChainTest {
         assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
         assertThat(JSON.readTree(response.body())).isEqualTo(JSON.valueToTree(diagnosis));
         System.out.println("PIPESOR_DIAGNOSTIC_HTTP 401 503 200 verified for " + diagnosis.correlationId());
+        UUID reviewId = localRead.reviewId.get();
+        if (reviewId != null) {
+            var uri = loopback(port).resolve("/local-demo/v1/diagnoses/" + reviewId + "/review");
+            var client = HttpClient.newHttpClient();
+            var denied = HttpRequest.newBuilder(uri).header("Authorization", "Bearer fixture-other-scope").build();
+            assertThat(client.send(denied, HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(404);
+            var accepted = HttpRequest.newBuilder(uri).header("Authorization", "Bearer " + localRead.token).build();
+            var view = client.send(accepted, HttpResponse.BodyHandlers.ofString());
+            assertThat(view.statusCode()).isEqualTo(200);
+            assertThat(JSON.readTree(view.body()).path("original")).isEqualTo(JSON.valueToTree(diagnosis));
+        }
         var browserCheck = System.getenv("PIPESOR_DEMO_BROWSER_CHECK");
         if (browserCheck != null && !browserCheck.isBlank()) {
             var log = Files.createTempFile("pipesor-browser-", ".log");
@@ -234,6 +252,10 @@ class FullOwnerChainTest {
                         .redirectErrorStream(true).redirectOutput(log.toFile());
                 command.environment().put("PIPESOR_DEMO_PORT", Integer.toString(port));
                 command.environment().put("PIPESOR_DEMO_TOKEN", localRead.token);
+                if (reviewId != null) {
+                    command.environment().put("PIPESOR_REVIEW_IDS", reviewId.toString());
+                    command.environment().put("PIPESOR_REVIEW_TOKEN", localRead.token);
+                }
                 var browser = command.start();
                 try {
                     assertThat(browser.waitFor(60, TimeUnit.SECONDS)).as("Browser check finished").isTrue();
@@ -245,6 +267,18 @@ class FullOwnerChainTest {
             } finally {
                 Files.deleteIfExists(log);
             }
+        }
+        if (reviewId != null) {
+            assertThat(jdbc.queryForList("""
+                    SELECT decision FROM diagnosis.human_reviews WHERE diagnostic_id = ? ORDER BY revision
+                    """, String.class, reviewId)).containsExactly("CONFIRMED", "CORRECTED", "REJECTED");
+            var endpoint = loopback(port).resolve("/local-demo/v1/diagnoses/" + reviewId + "/review");
+            var request = HttpRequest.newBuilder(endpoint).header("Authorization", "Bearer " + localRead.token).build();
+            var finalView = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            assertThat(finalView.statusCode()).isEqualTo(200);
+            assertThat(JSON.readTree(finalView.body()).path("original")).isEqualTo(JSON.valueToTree(diagnosis));
+            System.out.println("PIPESOR_INTEGRATED_REVIEW_RECEIPT " + JSON.writeValueAsString(JSON.readTree(finalView.body())));
+            System.out.println("PIPESOR_INTEGRATED_REVIEW persisted CONFIRMED CORRECTED REJECTED; cross-scope 404");
         }
     }
 
