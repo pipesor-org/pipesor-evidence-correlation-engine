@@ -212,12 +212,20 @@ class FullOwnerChainTest {
                 assertThat(members(eventA.input().executionId())).containsExactlyInAnyOrder(
                         List.of(eventA.input().evidenceId()), canonicalMembers);
                 assertThat(members(eventC.input().executionId())).containsExactly(List.of(eventC.input().evidenceId()));
-                assertThat(jdbc.queryForObject("""
-                        SELECT signals::text FROM diagnosis.correlated_context_receipts
+                var receipt = jdbc.queryForMap("""
+                        SELECT scope_revision, signals::text AS signals
+                        FROM diagnosis.correlated_context_receipts
                         WHERE execution_id = ? AND cardinality(evidence_ids) = 2
-                        """, String.class, eventA.input().executionId())).satisfies(signals ->
-                        assertThat(JSON.readTree(signals)).extracting(signal -> signal.get("evidence_id").asString())
-                                .containsExactlyElementsOf(introduced.stream().map(UUID::toString).toList()));
+                        """, eventA.input().executionId());
+                assertThat(receipt.get("scope_revision")).isEqualTo(MEMBER_B_REVISION);
+                var signals = JSON.readTree((String) receipt.get("signals"));
+                assertThat(signals).extracting(signal -> signal.get("evidence_id").asString())
+                        .containsExactlyElementsOf(introduced.stream().map(UUID::toString).toList());
+                for (var signal : signals) {
+                    assertThat(signal.propertyNames()).containsExactlyInAnyOrder(
+                            "evidence_id", "origin_context_id", "correlation_id", "stage", "summary", "content");
+                }
+                System.out.println("PILOT_LEGACY_PROVENANCE mixed revisions retained; v1 receipt carries no member capture scope");
             }
         } finally {
             api.stop(0);

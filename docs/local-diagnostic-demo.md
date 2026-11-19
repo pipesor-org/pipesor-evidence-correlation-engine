@@ -196,3 +196,13 @@ production readiness remain unverified.
 With the frontend's operational-pilot verifier, the E02 owner-chain fixture exercises Pipeline's existing delegated HTTP reads. Its test-only identity uses the real Pipeline JWT claim validator and a signed local token, a seeded VIEW grant, and the existing explicit GitHub facts double. Chromium discovers the incident from Operations and reloads the operational Workspace without a harness-supplied incident or diagnostic identifier. Look for `PILOT_PIPELINE_HTTP` and `PILOT_CHROMIUM`.
 
 The existing review check remains a separate scoped diagnostic-ID path. PD-011/034 still need the authorized product association and query contract. No Pipeline or Recommendation production configuration is changed.
+
+For the historical-provenance baseline, `PILOT_LEGACY_PROVENANCE` confirms the
+PostgreSQL receipt retains both members after admitting evidence from two
+capture revisions. The v1 receipt records only the latest contribution's scope
+revision and each signal's evidence/context references. Repeat the E02
+`pgvector-fixture` review command above to exercise this check along with
+`PILOT_CHROMIUM` and the separate scoped P3 journey. A mixed or otherwise
+unverifiable v1 receipt cannot certify the proposed incident-to-diagnosis read.
+See the [proposed owner guarantees](https://github.com/pipesor-org/pipesor-docs/pull/23)
+and [Ingestion restart evidence](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/pull/18).
