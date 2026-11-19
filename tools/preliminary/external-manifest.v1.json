@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "dataset": {
+    "name": "LogChunks",
+    "version": "1.0.0",
+    "doi": "10.5281/zenodo.3632351",
+    "license": "CC BY 4.0",
+    "original_platform": "Travis CI",
+    "archive_sha256": "fa2e3d10fc700cfe06b92b286741666a6389b46548356da9f0679c0d89be7fa8",
+    "crossvalidation_member": "LogChunks/developer-crossvalidation.csv",
+    "crossvalidation_sha256": "d7b673b388df3efa1451b3c1f2f3ce84f4a395d36b983e1017f11c5d3136ff0f"
+  },
+  "peer_revisions": {
+    "pipeline": "0f9b440db958794fc2be2da485c20ecc61d47099",
+    "log_event": "6f4dfa8c2f4176449c8290bc307b46527251b7b1",
+    "nlp": "92fea50081f0e1150c8ae9a78d9c5e162b7e0611",
+    "recommendation": "aa8ce3b",
+    "rag": "1772c18e2b31d228ee05a82a2b145827930baebd"
+  },
+  "mapping": "Use one reviewed source line. All GitHub-shaped IDs, commit, scope and timestamps in the local envelope are synthetic contract adapters, never original metadata. Map to BUILD as an analysis-stage interpretation.",
+  "execution_policy": "Local deterministic only; no provider calls or authorized external-model processing",
+  "cases": [
+    {
+      "id": "E04",
+      "build_id": "574602754",
+      "stage": "BUILD",
+      "log_member": "LogChunks/logs/Elixir/elixir-lang@elixir/failed/574602754.log",
+      "annotation_member": "LogChunks/build-failure-reason/Elixir/elixir-lang@elixir.xml",
+      "raw_sha256": "905b1b44375aad4a62958332128d4812dc7f2714eab5579ff7b406b118483e2d",
+      "annotation_sha256": "72c1b22ddfa9c4d4ab498c753502d84049a1702dec6775f0bb9de97ccd8f1470",
+      "line": 247,
+      "line_sha256": "7a5a8d96cd115991fe9f78ef83b8d0ada7517251a964ae4cd0d6d0c53ffaaa57",
+      "sanitized_excerpt": "** (Mix) mix format failed due to --check-formatted.",
+      "source_annotation": "Mix formatting gate rejected unformatted source.",
+      "independent_confirmation": "Developer confirmed the extracted passage in the dataset cross-validation; no independent upstream root cause established",
+      "reference_limit": "The gate failure is observed; the cause of formatting drift is unknown.",
+      "sanitization": "Remove ANSI and CR; omit file list and surrounding output."
+    },
+    {
+      "id": "E05",
+      "build_id": "566824752",
+      "stage": "BUILD",
+      "log_member": "LogChunks/logs/Go/ethereum@go-ethereum/failed/566824752.log",
+      "annotation_member": "LogChunks/build-failure-reason/Go/ethereum@go-ethereum.xml",
+      "raw_sha256": "733fc3b002d1f15d6b29863b181461752dc31251edd3389c8ed5990146c70a1d",
+      "annotation_sha256": "a7ef40086ca39663626fbdfeb68e8b405e0ba5b63d530cde2cf2b987d4f40e3e",
+      "line": 930,
+      "line_sha256": "b95671ccab1f10ba48c2a5af709f9f0c88c24c52d6de50bd4d3d68911828213c",
+      "sanitized_excerpt": "fatal error: 'libproc.h' file not found",
+      "source_annotation": "Compilation stopped when a required header could not be found.",
+      "independent_confirmation": "Developer confirmed the extracted passage in the dataset cross-validation; no independent upstream root cause established",
+      "reference_limit": "The excerpt does not distinguish a missing SDK, include-path configuration, or incompatible host.",
+      "sanitization": "Remove source path, line and column, CR, and surrounding output."
+    },
+    {
+      "id": "E06",
+      "build_id": "549434310",
+      "stage": "BUILD",
+      "log_member": "LogChunks/logs/Haskell/purescript@purescript/failed/549434310.log",
+      "annotation_member": "LogChunks/build-failure-reason/Haskell/purescript@purescript.xml",
+      "raw_sha256": "8131ad5e31a644c4e798ee355f9e861d966e11abaeebf8a2434513613ebd3d3b",
+      "annotation_sha256": "4bcbaf629f9475be0b36ca814034446a6edabdfb116b7a8e480ffc5f8de7655a",
+      "line": 3150,
+      "line_sha256": "7b32f23d796bc339851c67ec4230b4f5b8c47359e591e38ea4cfeb5ff302452d",
+      "sanitized_excerpt": "The command \"$TIMEOUT 35m ci/build.sh\" exited with 124.",
+      "source_annotation": "A timeout-wrapped build command exited with status 124.",
+      "independent_confirmation": "Developer confirmed the extracted passage in the dataset cross-validation; no independent upstream root cause established",
+      "reference_limit": "Consistent with a timeout; the cause of the delay is unknown and the status alone cannot establish it.",
+      "sanitization": "Remove Travis timing telemetry, ANSI and surrounding output; retain public build command and exit status as inert text."
+    }
+  ]
+}

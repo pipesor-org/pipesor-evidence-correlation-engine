@@ -67,6 +67,14 @@ case "$scenario" in
         cp "$fixture/log-event-service/src/test/resources/protected-workflow-evidence-v2.json" "$resources/"
         cp "$correlation/tools/local-handoff/checkout-failure.log" "$resources/"
         ;;
+    external)
+        [[ "$rag_mode:$llm_mode" == pgvector-fixture:fixture ||
+            ( "$rag_mode:$llm_mode" == hybrid:foundry &&
+              "$PIPESOR_DEMO_EXTERNAL_INPUT" == "$PIPESOR_DEMO_FOUNDRY_EVIDENCE_DIR" &&
+              ( "$PIPESOR_DEMO_EXTERNAL_CASE" == E05 || "$PIPESOR_DEMO_EXTERNAL_CASE" == E06 ) ) ]] || exit 2
+        cp "${PIPESOR_DEMO_EXTERNAL_INPUT:?}/envelope.json" "$resources/protected-workflow-evidence-v2.json"
+        cp "$PIPESOR_DEMO_EXTERNAL_INPUT/log.txt" "$resources/checkout-failure.log"
+        ;;
     E02|E03)
         [[ "$rag_mode:$llm_mode" == pgvector-fixture:fixture ||
             "$rag_mode:$llm_mode" == hybrid:foundry ]] || exit 2
@@ -102,6 +110,10 @@ if [[ "$rag_mode" != fixture ]]; then
     if [[ "$scenario" != local-checkout-dns && "$rag_mode" == hybrid ]]; then
         rag_env+=(PIPESOR_RAG_EMBEDDING_MAX_RETRIES=0 AZURE_TOKEN_CREDENTIALS=AzureCliCredential)
     fi
+    if [[ "$scenario:$rag_mode" == external:hybrid ]]; then
+        rag_env+=(PIPESOR_DEMO_EXTERNAL_CASE="$PIPESOR_DEMO_EXTERNAL_CASE"
+            PIPESOR_DEMO_FOUNDRY_EVIDENCE_DIR="$PIPESOR_DEMO_FOUNDRY_EVIDENCE_DIR")
+    fi
     (cd "$fixture/rag-retrieval" && env -i "${rag_env[@]}" "$python_bin" -m alembic upgrade head)
 fi
 
@@ -122,6 +134,7 @@ fi
 
 cd "$host"
 PYTHONPATH="$fixture/nlp-log-processor/src" ./mvnw -B -ntp -Dtest=FullOwnerChainTest \
+    "-Djdk.httpclient.disableRetryConnect=true" \
     "-Dpipesor.fixture.scenario=$scenario" \
     "-Dpipesor.fixture.rag.port=$rag_port" \
     "-Dpipesor.fixture.rag.mode=$rag_mode" \

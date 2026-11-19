@@ -14,7 +14,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 import uvicorn
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from openai import OpenAI
+from openai import DefaultHttpxClient, OpenAI
 from sqlalchemy.orm import sessionmaker
 
 from pipesor_rag_retrieval.api import create_app
@@ -34,31 +34,67 @@ GUIDANCE = (
     if GUIDE == "runner-connectivity" else
     "Compare requested versions against the approved dependency index and check repository settings before changing constraints."
 )
+if SCENARIO == "external":
+    GUIDE = "failure-triage"
+    PROVENANCE = f"synthetic://pipesor/local-dev/{GUIDE}/v1"
+    GUIDANCE = "Preserve the first failing step and collect surrounding diagnostic output before assigning a cause."
 KIND = CorpusKind.AUTHORIZED_TECHNICAL_DOCUMENTATION
+
+
+EXTERNAL_LINES = {
+    "E05": "fatal error: 'libproc.h' file not found",
+    "E06": 'The command "$TIMEOUT 35m ci/build.sh" exited with 124.',
+}
 
 
 class MeteredEmbeddings:
     def __init__(self, settings):
         token = get_bearer_token_provider(DefaultAzureCredential(), "https://ai.azure.com/.default")
         self.endpoint = OpenAI(base_url=f"{settings.azure_openai_endpoint}/openai/v1/",
-                               api_key=token, max_retries=0).embeddings
+                               api_key=token, max_retries=0,
+                               http_client=DefaultHttpxClient(follow_redirects=False)).embeddings
         self.lock = Lock()
         self.attempts = 0
 
     def create(self, **request):
-        assert len(request["input"].encode()) <= 512
+        external = SCENARIO == "external"
+        if external:
+            reviewed = EXTERNAL_LINES[os.environ["PIPESOR_DEMO_EXTERNAL_CASE"]]
+            if request["input"] == "2026-11-08T09:20:31Z ##[error]" + reviewed:
+                request["input"] = reviewed
+            if request["input"] not in (reviewed, GUIDANCE) or request["model"] != "pipesor-dev-embeddings" or request["dimensions"] != 1536:
+                raise ValueError("Embedding input is outside the reviewed wire allowlist")
+        if len(request["input"].encode()) > 512:
+            raise ValueError("Embedding request exceeds its 512-token allowance")
         with self.lock:
             if self.attempts >= 8:
                 raise RuntimeError("Synthetic embedding budget exhausted")
             self.attempts += 1
-        response = self.endpoint.create(**request)
-        assert response.model == "text-embedding-3-small"
-        print("PIPESOR_EMBEDDING_USAGE " + json.dumps({
-            "model": response.model, "deployment": request["model"],
-            "prompt_tokens": response.usage.prompt_tokens,
-            "dimensions": len(response.data[0].embedding),
-        }), flush=True)
-        return response
+            attempt = self.attempts
+        info = {"deployment": request["model"], "reserved_nanodollars": 512 * 22}
+        if external:
+            receipt = Path(os.environ["PIPESOR_DEMO_FOUNDRY_EVIDENCE_DIR"]) / f"embedding-attempt-{attempt}.json"
+            with receipt.open("x") as slot:
+                json.dump(info, slot)
+        try:
+            raw = self.endpoint.with_raw_response.create(**request)
+            info["http"] = raw.status_code
+            response = raw.parse()
+            if response.model != "text-embedding-3-small" or response.usage.prompt_tokens > 512:
+                raise RuntimeError("Embedding model or token usage differs from reservation")
+            info.update(model=response.model, prompt_tokens=response.usage.prompt_tokens,
+                        dimensions=len(response.data[0].embedding),
+                        version="1")
+            print("PIPESOR_EMBEDDING_USAGE " + json.dumps(info), flush=True)
+            return response
+        except Exception as error:
+            info["failure"] = type(error).__name__
+            if getattr(error, "status_code", None) is not None:
+                info["http"] = error.status_code
+            raise
+        finally:
+            if external:
+                receipt.write_text(json.dumps(info) + "\n")
 
 
 def seed(settings, scope, embeddings):
@@ -89,7 +125,7 @@ def verify(scope, port):
     url = f"http://127.0.0.1:{port}/internal/v1/retrieval/query"
     payload = {
         "contract_version": "1.0", "correlation_id": "hybrid-scope-check",
-        "query": "How should a build runner troubleshoot a hostname lookup failure?",
+        "query": GUIDANCE if SCENARIO == "external" else "How should a build runner troubleshoot a hostname lookup failure?",
         "authorization_scope": {
             "tenant_id": str(scope.tenant_id), "github_installation_id": scope.github_installation_id,
             "github_repository_id": scope.github_repository_id, "pipeline_id": str(scope.pipeline_id),
