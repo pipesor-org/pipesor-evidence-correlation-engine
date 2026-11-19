@@ -165,25 +165,12 @@ the replay recover `duplicate` for the same operation. The fixture supplies
 synthetic owner decisions, credentials and limits. It checks the handoff in
 isolation from the signed NLP route, live authorities and Azure.
 
-### Local flow with NLP and evidence owners
+### Local diagnostic demonstration
 
-Use Java 25, Docker and the Python 3.14 environment prepared by the
-[NLP development guide](https://github.com/pipesor-org/pipesor-nlp-log-processor/blob/main/README.md#development-and-verification).
-Activate that environment or set `PYTHON_BIN` to its Python executable.
-
-```bash
-bash tools/verify_local_owner_chain.sh
-```
-
-Pass the directory containing the sibling service checkouts as the first
-argument when needed. The runner stages their committed `main` revisions in a
-temporary directory. It runs the NLP processing and HTTP delivery code against
-the signed Correlation intake, the signed Pipeline and Log/Event owner checks,
-and the Recommendation receipt endpoint. The Java components use loopback HTTP
-and disposable PostgreSQL 17.11. The test supplies synthetic credentials,
-parser output, current capture permissions and Recommendation authority. It
-registers protected evidence through the Log/Event store as fixture setup.
-Service Bus settlement, live identities and deployment require separate checks.
+Run `bash tools/verify_local_owner_chain.sh` with Java 25, Docker and a Python
+environment containing the NLP and RAG dependencies. The [demonstration guide](docs/local-diagnostic-demo.md)
+covers the companion Recommendation checkout, synthetic input, verified output,
+and evaluation boundaries.
 
 For documentation, check affected links and consistency with referenced sources,
 then run:
