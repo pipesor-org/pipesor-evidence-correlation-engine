@@ -58,6 +58,9 @@ final class RecommendationJson {
                 safeId(introduced.correlationId());
                 minimumBytes += (long) introduced.signal().summary().length() + introduced.signal().content().length()
                         + introduced.correlationId().length() + introduced.signal().stage().length() + 2L * 36;
+                if (introduced.signal().sourceLocator() != null) {
+                    minimumBytes += introduced.signal().sourceLocator().length();
+                }
                 if (minimumBytes > maxBytes) throw new RequestTooLarge();
                 text(introduced.signal().summary());
                 text(introduced.signal().content());
@@ -68,6 +71,9 @@ final class RecommendationJson {
                 signal.put("origin_context_id", introduced.originContextId().toString());
                 signal.put("stage", introduced.signal().stage());
                 signal.put("summary", introduced.signal().summary());
+                if (introduced.signal().sourceLocator() != null) {
+                    signal.put("source_locator", introduced.signal().sourceLocator());
+                }
                 signals.add(signal);
             }
             var last = revision.signals().getLast();

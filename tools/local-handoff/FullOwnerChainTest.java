@@ -136,7 +136,8 @@ class FullOwnerChainTest {
         assertThat(readDiagnosis(localRead.token).statusCode()).isEqualTo(503);
 
         ObjectNode a = protectedFixture();
-        try (var log = FullOwnerChainTest.class.getResourceAsStream("/checkout-failure.log")) {
+        boolean aggregate = "synthetic-aggregate".equals(System.getProperty("pipesor.fixture.scenario"));
+        if (!aggregate) try (var log = FullOwnerChainTest.class.getResourceAsStream("/checkout-failure.log")) {
             ((ObjectNode) a.get("evidence")).put("excerpt",
                     new String(log.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip());
         }
@@ -172,13 +173,30 @@ class FullOwnerChainTest {
                 assertThat(scope.queries).hasSize(1);
                 assertThat(owners.membershipCalls).hasValue(0);
                 assertEmptyCorrelation();
-                createOrigin(a, binding);
+                if (aggregate) {
+                    try (var snapshot = getClass().getResourceAsStream("/aggregate-snapshot.json")) {
+                        assertThat(snapshots.handle(new ExecutionSnapshotTransformer().fromJson(
+                                new String(snapshot.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)))).isEqualTo("APPLIED");
+                    }
+                } else { createOrigin(a, binding); }
                 assertRetryable(send(a, endpoint, null));
                 assertThat(owners.membershipCalls).hasValue(1);
                 assertEmptyCorrelation();
 
                 assertThat(owners.evidenceStore.register(eventA.input())).isEqualTo(Registration.CREATED);
                 assertNlp(send(a, endpoint, null), 200, "accepted");
+                if (aggregate) {
+                    assertThat(members(eventA.input().executionId())).containsExactly(List.of(eventA.input().evidenceId()));
+                    assertThat(jdbc.queryForObject("select signals::text from diagnosis.correlated_context_receipts where execution_id=?",
+                            String.class, eventA.input().executionId())).contains("Failed to execute goal").doesNotContain("synthetic-private-password");
+                    assertThat(owners.evidenceStore.register(eventA.input())).isEqualTo(Registration.UNCHANGED);
+                    assertNlp(send(a, endpoint, null), 200, "duplicate");
+                    String locator = a.at("/evidence/source_locator").asString();
+                    var changed = a.deepCopy();
+                    ((ObjectNode) changed.get("evidence")).put("source_locator", locator.substring(0, locator.length() - 64) + "0".repeat(64));
+                    assertThat(owners.evidenceStore.register(decode(changed).input())).isEqualTo(Registration.CONFLICT);
+                    return;
+                }
                 var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
                         a.get("correlation_id").asString(), localRead.reviewId::set);
                 localRead.result.set(diagnosis);

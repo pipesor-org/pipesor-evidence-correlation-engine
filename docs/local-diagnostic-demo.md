@@ -208,3 +208,26 @@ revision and each signal's evidence/context references. Repeat the E02
 unverifiable v1 receipt cannot certify the proposed incident-to-diagnosis read.
 See the [proposed owner guarantees](https://github.com/pipesor-org/pipesor-docs/pull/23)
 and [Ingestion restart evidence](https://github.com/pipesor-org/pipesor-ingestion-normalization-service/pull/18).
+
+### Synthetic aggregate capture receipt verification
+
+Run from the Correlation checkout with the existing owner-chain prerequisites.
+Use the reviewed peer revisions in place of the branch names once integrated.
+
+```bash
+PIPESOR_DEMO_SCENARIO=synthetic-aggregate \
+PIPESOR_DEMO_INGESTION_REF=96a64037f0773001f0cbabacf7b2392b9e2b7228 \
+PIPESOR_DEMO_LOG_EVENT_REF=feat/github-aggregate-provenance \
+PIPESOR_DEMO_NLP_REF=feat/github-aggregate-provenance \
+PYTHON_BIN=/tmp/pipesor-external-v4/bin/python \
+bash tools/verify_local_owner_chain.sh
+```
+
+The Ingestion PostgreSQL test creates a synthetic Maven failure, masks its
+credential-shaped test value and exports the two frozen publication bodies from
+the test build directory. The owner chain applies the actual snapshot to a
+test registration, stores the protected evidence and sends NLP output to the
+loopback Correlation endpoint. It verifies Recommendation receipt membership,
+duplicate delivery and changed-source conflict. The broker handoff uses files
+between test processes. The synthetic scope, identities and input bytes are
+local controls. This scenario requires neither provider acquisition nor inference.

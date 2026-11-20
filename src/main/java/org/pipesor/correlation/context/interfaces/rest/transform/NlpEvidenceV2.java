@@ -42,7 +42,8 @@ public record NlpEvidenceV2(
                     .decode(ByteBuffer.wrap(body)).toString();
             require(!input.startsWith("\ufeff"));
             JsonNode root = object(CanonicalJson.mapper().readTree(input));
-            require("2.0".equals(text(root, "contract_version")));
+            String version = text(root, "contract_version");
+            require("2.0".equals(version) || "2.1".equals(version));
             UUID messageId = uuid(root, "message_id");
             String trace = safeId(root, "correlation_id");
             require(messageId.toString().equals(idempotencyKey) && trace.equals(correlationId));
@@ -74,9 +75,15 @@ public record NlpEvidenceV2(
             UUID incidentId = uuid(root, "incident_id");
             UUID evidenceId = uuid(root, "evidence_id");
             String job = nullableText(root, "job", false);
+            String locator = null;
+            if ("2.1".equals(version)) {
+                locator = text(root, "source_locator");
+                require(job != null && job.matches("[1-9][0-9]*") && locator.matches(
+                        "v2:job:" + job + ":member:[0-9]{1,9}_verify\\.txt:lines:([1-9][0-9]{0,8})-\\1:sha256:[0-9a-f]{64}"));
+            } else { require(!root.has("source_locator")); }
             Long sequence = sequence(root);
             var signal = new EvidenceSignal(text(root, "stage"), text(root, "sanitized_summary"),
-                    text(root, "sanitized_content"));
+                    text(root, "sanitized_content"), locator);
             String template = text(root, "template");
 
             var significant = new TreeMap<String, Object>();
@@ -89,7 +96,8 @@ public record NlpEvidenceV2(
             significant.put("execution", sorted(Map.of("github_run_id", execution.githubRunId(),
                     "run_attempt", execution.runAttempt(), "status", execution.status(), "conclusion", execution.conclusion())));
             significant.put("commit", sorted(Map.of("sha", sha)));
-            significant.put("contract_version", "2.0");
+            significant.put("contract_version", version);
+            if (locator != null) { significant.put("source_locator", locator); }
             significant.put("message_id", messageId.toString());
             significant.put("correlation_id", trace);
             significant.put("source", source);
