@@ -159,7 +159,7 @@ public final class OwnerChain implements AutoCloseable {
         try {
             var claims = new JWTClaimsSet.Builder().issuer(ISSUER.toString()).audience(audience)
                     .claim("tid", tenant).claim("oid", subject).claim("scp", scope)
-                    .expirationTime(Date.from(Instant.now().plusSeconds(300))).build();
+                    .expirationTime(Date.from(Instant.now().plusSeconds(System.getenv("PIPESOR_DEMO_INTERACTIVE_DIR") == null ? 300 : 1800))).build();
             var jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.RS256), claims);
             jwt.sign(new RSASSASigner(KEYS.getPrivate()));
             return jwt.serialize();

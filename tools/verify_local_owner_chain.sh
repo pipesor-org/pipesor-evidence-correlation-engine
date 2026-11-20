@@ -4,7 +4,6 @@ set -euo pipefail
 correlation=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 peers=${1:-"$correlation/.."}
 python_bin=$("${PYTHON_BIN:-python3.14}" -c 'import drain3, uvicorn, sys; print(sys.executable)')
-fixture=$(mktemp -d /tmp/pipesor-owner-chain.XXXXXXXX)
 rag_pid=
 rag_db=
 scenario=${PIPESOR_DEMO_SCENARIO:-local-checkout-dns}
@@ -23,10 +22,28 @@ esac
 case "$rag_mode" in fixture|hybrid|pgvector-fixture) ;; *) exit 2 ;; esac
 review_fixture=no-review
 if [[ "${PIPESOR_DEMO_REVIEW:-0}" == 1 ]]; then
-    [[ "$scenario:$rag_mode:$llm_mode" == E02:pgvector-fixture:fixture ]] || exit 2
-    : "${PIPESOR_DEMO_BROWSER_CHECK:?Set the integrated review browser verifier}"
+    if [[ "$scenario:$rag_mode:$llm_mode" != E02:pgvector-fixture:fixture ]]; then
+        [[ "$scenario:$rag_mode:$llm_mode" == E02:hybrid:foundry ]] || exit 2
+        if [[ "${PIPESOR_DEMO_FOUNDRY_REVIEW_APPROVED:-0}" != 1 ]]; then
+            echo "Managed E02 review requires explicit inference-budget approval" >&2
+            exit 2
+        fi
+    fi
+    if [[ -z "${PIPESOR_DEMO_INTERACTIVE_DIR:-}" ]]; then
+        : "${PIPESOR_DEMO_BROWSER_CHECK:?Set the integrated review browser verifier}"
+    fi
     review_fixture=review
 fi
+if [[ -n "${PIPESOR_DEMO_REGISTRATION_BROWSER:-}${PIPESOR_DEMO_INTERACTIVE_DIR:-}" ]]; then
+    [[ "$scenario:$review_fixture" == E02:review ]] || exit 2
+fi
+if [[ -n "${PIPESOR_DEMO_INTERACTIVE_DIR:-}" ]]; then
+    [[ "$PIPESOR_DEMO_INTERACTIVE_DIR" == /tmp/* && ! -L "$PIPESOR_DEMO_INTERACTIVE_DIR" &&
+        "$(stat -c '%a:%u' "$PIPESOR_DEMO_INTERACTIVE_DIR")" == "700:$(id -u)" &&
+        -z "$(find "$PIPESOR_DEMO_INTERACTIVE_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]] || exit 2
+    [[ -z "${PIPESOR_DEMO_REGISTRATION_BROWSER:-}${PIPESOR_DEMO_BROWSER_CHECK:-}" ]] || exit 2
+fi
+fixture=$(mktemp -d /tmp/pipesor-owner-chain.XXXXXXXX)
 cleanup() {
     if [[ -n "$rag_pid" ]]; then
         kill "$rag_pid" 2>/dev/null || true
@@ -34,6 +51,9 @@ cleanup() {
     fi
     if [[ -n "$rag_db" ]]; then
         docker rm -f "$rag_db" >/dev/null || true
+    fi
+    if [[ -n "${PIPESOR_DEMO_INTERACTIVE_DIR:-}" ]]; then
+        rm -f -- "$PIPESOR_DEMO_INTERACTIVE_DIR"/{pipeline-token,review-token,port,catalog.json,review-path,validation-path,replay,stop}
     fi
     rm -rf -- "$fixture"
 }
@@ -90,7 +110,7 @@ case "$scenario" in
     *) exit 2 ;;
 esac
 cp "$correlation/tools/local-handoff/$review_fixture/DemoReview.java" "$host/src/test/java/"
-cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis,FoundryDiagnosticFixture,OperationalPilotIdentity}.java "$host/src/test/java/"
+cp "$correlation/tools/local-handoff/"{FullOwnerChainTest,OwnerChain,DemoDiagnosis,FoundryDiagnosticFixture,OperationalPilotIdentity,RegisteredE02}.java "$host/src/test/java/"
 
 rag_env=(PYTHONPATH="$fixture/rag-retrieval/src" PIPESOR_DEMO_SCENARIO="$scenario" PIPESOR_DEMO_RAG_MODE="$rag_mode")
 rag_server=serve_rag_fixture.py
