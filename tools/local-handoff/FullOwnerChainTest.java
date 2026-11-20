@@ -150,7 +150,8 @@ class FullOwnerChainTest {
         var binding = eventA.binding();
         var caller = new Caller("fixture-nlp", "fixture-workflow", binding.tenantId(), binding.githubAccountId(),
                 binding.githubInstallationId(), binding.githubRepositoryId(), binding.githubWorkflowId());
-        insertPipeline(binding);
+        if (RegisteredE02.enabled()) RegisteredE02.register(port, github, binding);
+        else insertPipeline(binding);
 
         var api = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         try (var owners = new OwnerChain(source, port, binding.tenantId(), binding.githubInstallationId());
@@ -181,7 +182,7 @@ class FullOwnerChainTest {
                 var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
                         a.get("correlation_id").asString(), localRead.reviewId::set);
                 localRead.result.set(diagnosis);
-                if ("E02".equals(System.getProperty("pipesor.fixture.scenario"))) verifyOperationalHttp(diagnosis, binding.githubRepositoryId());
+                if ("E02".equals(System.getProperty("pipesor.fixture.scenario"))) verifyOperationalHttp(diagnosis, binding);
                 verifyDiagnosticHttp(diagnosis);
                 assertThat(owners.evidenceStore.register(eventB.input())).isEqualTo(Registration.CREATED);
 
@@ -256,6 +257,12 @@ class FullOwnerChainTest {
             assertThat(view.statusCode()).isEqualTo(200);
             assertThat(JSON.readTree(view.body()).path("original")).isEqualTo(JSON.valueToTree(diagnosis));
         }
+        if (RegisteredE02.interactive()) {
+            RegisteredE02.present(diagnosis.incidentId(), java.util.Objects.requireNonNull(reviewId), localRead.token);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM diagnosis.human_reviews WHERE diagnostic_id = ?",
+                    Integer.class, reviewId)).isPositive();
+            return;
+        }
         var browserCheck = System.getenv("PIPESOR_DEMO_BROWSER_CHECK");
         if (browserCheck != null && !browserCheck.isBlank()) {
             var log = Files.createTempFile("pipesor-browser-", ".log");
@@ -298,7 +305,8 @@ class FullOwnerChainTest {
         }
     }
 
-    private void verifyOperationalHttp(Diagnosis diagnosis, String repository) throws Exception {
+    private void verifyOperationalHttp(Diagnosis diagnosis, ProtectedEvidenceV2.Binding binding) throws Exception {
+        String repository = binding.githubRepositoryId();
         var uri = loopback(port).resolve("/api/v1/incidents/" + diagnosis.incidentId());
         var client = HttpClient.newHttpClient();
         var valid = OperationalPilotIdentity.token(OperationalPilotIdentity.TENANT);
@@ -313,7 +321,8 @@ class FullOwnerChainTest {
         try {
             assertThat(client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(403);
         } finally {
-            OperationalPilotIdentity.grant(github, repository);
+            if (RegisteredE02.enabled()) RegisteredE02.facts(github, binding);
+            else OperationalPilotIdentity.grant(github, repository);
         }
         OperationalPilotIdentity.unavailable(github, true);
         try {

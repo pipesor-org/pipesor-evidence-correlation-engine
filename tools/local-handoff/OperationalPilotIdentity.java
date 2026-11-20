@@ -34,6 +34,13 @@ public class OperationalPilotIdentity {
         return actor;
     }
 
+    public static void onboardingFacts(GitHubConnectorDouble facts, String repository, String workflow,
+            String installation, String name, String workflowName, String file) {
+        var actor = TENANT + ":" + SUBJECT;
+        facts.facts(actor, repository, new RepositoryAccess(repository, installation, true, true, true));
+        facts.workflow(actor, repository, workflow, name, "main", workflowName, file);
+    }
+
     public static void denyRepository(GitHubConnectorDouble facts, String repository) {
         facts.facts(TENANT + ":" + SUBJECT, repository, new RepositoryAccess(repository, null, false, false, false));
     }

@@ -1,5 +1,7 @@
 # Local diagnostic demonstration
 
+For the interactive registered-workflow journey, use the [registered E02 advisor run](registered-e02-advisor.md).
+
 For the manuscript property mapping and planned external cases, see the
 [preliminary scenario suite](preliminary-validation.md).
 
