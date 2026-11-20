@@ -101,6 +101,15 @@ case "$scenario" in
         cp "${PIPESOR_DEMO_EXTERNAL_INPUT:?}/envelope.json" "$resources/protected-workflow-evidence-v2.json"
         cp "$PIPESOR_DEMO_EXTERNAL_INPUT/log.txt" "$resources/checkout-failure.log"
         ;;
+    synthetic-aggregate)
+        [[ "$rag_mode:$llm_mode:$review_fixture" == fixture:fixture:no-review ]] || exit 2
+        stage ingestion-normalization-service "${PIPESOR_DEMO_INGESTION_REF:-main}"
+        producer="$fixture/ingestion-normalization-service"
+        (cd "$producer" && ./mvnw -B -ntp -Dpipesor.test.exportAggregate=true \
+            '-Dtest=CapturePersistenceTests#aggregateReceiptFreezesProtectedOriginalLineProvenance' test)
+        cp "$producer/target/synthetic-aggregate/evidence.json" "$resources/protected-workflow-evidence-v2.json"
+        cp "$producer/target/synthetic-aggregate/snapshot.json" "$resources/aggregate-snapshot.json"
+        ;;
     E02|E03)
         [[ "$rag_mode:$llm_mode" == pgvector-fixture:fixture ||
             "$rag_mode:$llm_mode" == hybrid:foundry ]] || exit 2
