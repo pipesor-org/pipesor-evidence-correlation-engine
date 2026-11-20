@@ -83,7 +83,7 @@ public record NlpEvidenceV2(
             } else { require(!root.has("source_locator")); }
             Long sequence = sequence(root);
             var signal = new EvidenceSignal(text(root, "stage"), text(root, "sanitized_summary"),
-                    text(root, "sanitized_content"));
+                    text(root, "sanitized_content"), locator);
             String template = text(root, "template");
 
             var significant = new TreeMap<String, Object>();

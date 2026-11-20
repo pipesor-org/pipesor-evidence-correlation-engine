@@ -90,6 +90,7 @@ class NlpEvidenceV2Test {
         String prefix = "v2:job:701:member:0_verify.txt:lines:2-2:sha256:";
         node.put("job", "701").put("contract_version", "2.1").put("source_locator", prefix + "a".repeat(64));
         var first = decode(node);
+        assertThat(first.signal().sourceLocator()).isEqualTo(prefix + "a".repeat(64));
         assertThat(decode(node).fingerprint()).isEqualTo(first.fingerprint());
         node.put("source_locator", prefix + "b".repeat(64));
         assertThat(decode(node).fingerprint()).isNotEqualTo(first.fingerprint());

@@ -216,7 +216,7 @@ Use the reviewed peer revisions in place of the branch names once integrated.
 
 ```bash
 PIPESOR_DEMO_SCENARIO=synthetic-aggregate \
-PIPESOR_DEMO_INGESTION_REF=feat/github-aggregate-provenance \
+PIPESOR_DEMO_INGESTION_REF=96a64037f0773001f0cbabacf7b2392b9e2b7228 \
 PIPESOR_DEMO_LOG_EVENT_REF=feat/github-aggregate-provenance \
 PIPESOR_DEMO_NLP_REF=feat/github-aggregate-provenance \
 PYTHON_BIN=/tmp/pipesor-external-v4/bin/python \

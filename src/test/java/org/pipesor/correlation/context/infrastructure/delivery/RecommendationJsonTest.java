@@ -2,6 +2,7 @@ package org.pipesor.correlation.context.infrastructure.delivery;
 
 import org.junit.jupiter.api.Test;
 import org.pipesor.correlation.context.application.ports.RecommendationDelivery.Status;
+import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
 import org.pipesor.correlation.context.domain.model.valueobjects.ScopeEnvelope;
 
 import java.nio.charset.StandardCharsets;
@@ -39,6 +40,26 @@ class RecommendationJsonTest {
         assertThat(encoded).contains("\"pipeline_id\":null", "🧪 / résumé", "\\b\\t\\n\\f\\r\\u0001\\u000b\\u001f");
         assertThat(encoded).doesNotContain("\\/", "\\u001F");
         assertThat(DeliveryFixtures.JSON.readTree(encoded).get("context").get("summary").asString()).isEqualTo(text);
+    }
+
+    @Test
+    void preservesAggregateSourceLocatorForRecommendation() throws Exception {
+        var original = DeliveryFixtures.revision(DeliveryFixtures.vectors().get(0));
+        var signals = new ArrayList<>(original.signals());
+        var introduced = signals.getFirst();
+        var signal = introduced.signal();
+        String locator = "v2:job:701:member:0_verify.txt:lines:2-2:sha256:" + "a".repeat(64);
+        signals.set(0, new org.pipesor.correlation.context.application.queries.CorrelatedRevision.IntroducedSignal(
+                introduced.evidenceId(), introduced.originContextId(), introduced.correlationId(),
+                new EvidenceSignal(signal.stage(), signal.summary(), signal.content(), locator)));
+        var revision = new org.pipesor.correlation.context.application.queries.CorrelatedRevision(
+                original.contextId(), original.groupId(), original.revision(), signals, original.scope(),
+                original.incidentId(), original.executionId(), original.summary(), original.correlationId(),
+                original.createdAt());
+
+        var encoded = DeliveryFixtures.JSON.readTree(RecommendationJson.encode(revision, 20_000));
+
+        assertThat(encoded.get("signals").get(0).get("source_locator").asString()).isEqualTo(locator);
     }
 
     @Test
