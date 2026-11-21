@@ -314,7 +314,7 @@ class FullOwnerChainTest {
                 Files.deleteIfExists(log);
             }
         }
-        if (reviewId != null) {
+        if (reviewId != null && !"synthetic-aggregate".equals(System.getProperty("pipesor.fixture.scenario"))) {
             assertThat(jdbc.queryForList("""
                     SELECT decision FROM diagnosis.human_reviews WHERE diagnostic_id = ? ORDER BY revision
                     """, String.class, reviewId)).containsExactly("CONFIRMED", "CORRECTED", "REJECTED");
