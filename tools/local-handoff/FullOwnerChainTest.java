@@ -188,7 +188,7 @@ class FullOwnerChainTest {
                 if (aggregate) {
                     assertThat(members(eventA.input().executionId())).containsExactly(List.of(eventA.input().evidenceId()));
                     assertThat(jdbc.queryForObject("select signals::text from diagnosis.correlated_context_receipts where execution_id=?",
-                            String.class, eventA.input().executionId())).contains("Failed to execute goal").doesNotContain("synthetic-private-password");
+                            String.class, eventA.input().executionId())).contains("Failed to execute goal", a.at("/evidence/source_locator").asString()).doesNotContain("synthetic-private-password");
                     assertThat(owners.evidenceStore.register(eventA.input())).isEqualTo(Registration.UNCHANGED);
                     assertNlp(send(a, endpoint, null), 200, "duplicate");
                     String locator = a.at("/evidence/source_locator").asString();

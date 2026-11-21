@@ -40,7 +40,7 @@ class CorrelatedContextPersistenceTest {
                 .defaultSchema("evidence")
                 .table("flyway_history_local_correlation")
                 .load();
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(5);
         context = new SpringApplicationBuilder(CorrelationApplication.class)
                 .web(WebApplicationType.NONE)
                 .run("--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
@@ -76,7 +76,7 @@ class CorrelatedContextPersistenceTest {
                         "correlation_id:text:NO", "created_at:timestamptz:NO", "group_id:uuid:NO",
                         "signal_stage:text:NO", "signal_summary:text:NO", "signal_content:text:NO",
                         "scope_tenant_id:uuid:NO", "scope_github_installation_id:text:NO", "scope_github_repository_id:text:NO",
-                        "scope_pipeline_id:uuid:YES", "scope_revision:text:NO");
+                        "scope_pipeline_id:uuid:YES", "scope_revision:text:NO", "signal_source_locator:text:YES");
             }
             try (var rows = statement.executeQuery("""
                     SELECT table_schema || '.' || table_name FROM information_schema.tables
