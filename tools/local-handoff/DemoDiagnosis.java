@@ -46,14 +46,19 @@ final class DemoDiagnosis {
         var signal = signals.get(0);
         var evidence = new Evidence(UUID.fromString(signal.get("evidence_id").asString()),
                 UUID.fromString(signal.get("origin_context_id").asString()), signal.get("stage").asString(),
-                signal.get("content").asString());
+                signal.get("content").asString(),
+                signal.has("source_locator") ? signal.get("source_locator").asString() : null);
         assertThat(evidence.evidenceId()).isEqualTo(expectedEvidence);
         assertThat(evidence.originContextId()).isEqualTo(context);
         var scenario = System.getProperty("pipesor.fixture.scenario", "local-checkout-dns");
         boolean external = "external".equals(scenario);
         boolean dependency = "E02".equals(scenario);
         boolean ambiguous = "E03".equals(scenario);
-        if (!external) {
+        boolean aggregate = "synthetic-aggregate".equals(scenario);
+        if (aggregate) {
+            assertThat(evidence.sourceLocator()).startsWith("v2:job:");
+            assertThat(evidence.content()).contains("Failed to execute goal");
+        } else if (!external) {
             assertThat(evidence.stage()).isEqualTo(dependency || ambiguous ? "BUILD" : "INFRASTRUCTURE");
             assertThat(evidence.content()).contains(switch (scenario) {
                 case "E02" -> "Could not find org.example:fixture-lib:9.9.9";
@@ -100,6 +105,12 @@ final class DemoDiagnosis {
             return managed.infer(observed, knowledge);
         } : (observed, knowledge) -> {
             var line = observed.getFirst();
+            if (aggregate) {
+                assertThat(knowledge).hasSize(1);
+                return new Hypothesis("Synthetic Maven goal failure.",
+                        knowledge.getFirst().content(), "The selected line does not establish a root cause.",
+                        List.of(line.evidenceId()), List.of(knowledge.getFirst().chunkId()));
+            }
             if (external) {
                 assertThat(knowledge).hasSize(1);
                 return new Hypothesis("Observed failure: " + line.content(), knowledge.getFirst().content(),
@@ -164,7 +175,7 @@ final class DemoDiagnosis {
             System.out.println("PIPESOR_FOUNDRY_VALIDATION no-match: accepted evidence-only diagnosis");
         } else {
             assertThat(output.hypothesis().evidenceIds()).containsExactly(expectedEvidence);
-            if (!foundry && !external) assertThat(output.hypothesis().probableCause()).contains(
+            if (!foundry && !external && !aggregate) assertThat(output.hypothesis().probableCause()).contains(
                     ambiguous ? "cannot be determined" : dependency ? "org.example:fixture-lib:9.9.9" : "could not resolve");
         }
 

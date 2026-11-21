@@ -183,12 +183,12 @@ final class DurableCorrelationStore {
                     execute(connection, """
                             INSERT INTO evidence.correlated_contexts
                             (id, incident_id, execution_id, evidence_ids, summary, correlation_id, created_at, group_id,
-                             signal_stage, signal_summary, signal_content,
+                             signal_stage, signal_summary, signal_content, signal_source_locator,
                              scope_tenant_id, scope_github_installation_id, scope_github_repository_id, scope_pipeline_id, scope_revision)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """, snapshot.id(), snapshot.incidentId(), snapshot.executionId(),
                             snapshot.evidenceIds(), snapshot.summary(), snapshot.correlationId(), now, groupId,
-                            input.signal().stage(), input.signal().summary(), input.signal().content(), input.scope().tenantId(),
+                            input.signal().stage(), input.signal().summary(), input.signal().content(), input.signal().sourceLocator(), input.scope().tenantId(),
                             input.scope().installationId(), input.scope().repositoryId(), input.scope().pipelineId(), input.scope().revision());
                 }
                 execute(connection, """
@@ -449,7 +449,7 @@ final class DurableCorrelationStore {
                     rows.getObject("execution_id", UUID.class), (UUID[]) evidence.getArray(),
                     rows.getString("summary"), rows.getString("correlation_id"),
                     rows.getObject("created_at", OffsetDateTime.class).toInstant(), rows.getObject("group_id", UUID.class),
-                    new EvidenceSignal(rows.getString("signal_stage"), rows.getString("signal_summary"), rows.getString("signal_content")),
+                    new EvidenceSignal(rows.getString("signal_stage"), rows.getString("signal_summary"), rows.getString("signal_content"), rows.getString("signal_source_locator")),
                     new ScopeEnvelope(rows.getObject("scope_tenant_id", UUID.class), rows.getString("scope_github_installation_id"),
                             rows.getString("scope_github_repository_id"), rows.getObject("scope_pipeline_id", UUID.class), rows.getString("scope_revision")));
         } finally {

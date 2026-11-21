@@ -188,13 +188,18 @@ class FullOwnerChainTest {
                 if (aggregate) {
                     assertThat(members(eventA.input().executionId())).containsExactly(List.of(eventA.input().evidenceId()));
                     assertThat(jdbc.queryForObject("select signals::text from diagnosis.correlated_context_receipts where execution_id=?",
-                            String.class, eventA.input().executionId())).contains("Failed to execute goal").doesNotContain("synthetic-private-password");
+                            String.class, eventA.input().executionId())).contains("Failed to execute goal", a.at("/evidence/source_locator").asString()).doesNotContain("synthetic-private-password");
                     assertThat(owners.evidenceStore.register(eventA.input())).isEqualTo(Registration.UNCHANGED);
                     assertNlp(send(a, endpoint, null), 200, "duplicate");
                     String locator = a.at("/evidence/source_locator").asString();
                     var changed = a.deepCopy();
                     ((ObjectNode) changed.get("evidence")).put("source_locator", locator.substring(0, locator.length() - 64) + "0".repeat(64));
                     assertThat(owners.evidenceStore.register(decode(changed).input())).isEqualTo(Registration.CONFLICT);
+                    var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
+                            a.get("correlation_id").asString(), localRead.reviewId::set);
+                    assertThat(diagnosis.evidence().getFirst().sourceLocator()).isEqualTo(locator);
+                    localRead.result.set(diagnosis);
+                    verifyDiagnosticHttp(diagnosis);
                     return;
                 }
                 var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
@@ -309,7 +314,7 @@ class FullOwnerChainTest {
                 Files.deleteIfExists(log);
             }
         }
-        if (reviewId != null) {
+        if (reviewId != null && !"synthetic-aggregate".equals(System.getProperty("pipesor.fixture.scenario"))) {
             assertThat(jdbc.queryForList("""
                     SELECT decision FROM diagnosis.human_reviews WHERE diagnostic_id = ? ORDER BY revision
                     """, String.class, reviewId)).containsExactly("CONFIRMED", "CORRECTED", "REJECTED");

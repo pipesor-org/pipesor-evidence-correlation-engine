@@ -212,14 +212,11 @@ and [Ingestion restart evidence](https://github.com/pipesor-org/pipesor-ingestio
 ### Synthetic aggregate capture receipt verification
 
 Run from the Correlation checkout with the existing owner-chain prerequisites.
-Use the reviewed peer revisions in place of the branch names once integrated.
+The peer defaults stage the local main commits and print their exact revisions.
 
 ```bash
 PIPESOR_DEMO_SCENARIO=synthetic-aggregate \
-PIPESOR_DEMO_INGESTION_REF=96a64037f0773001f0cbabacf7b2392b9e2b7228 \
-PIPESOR_DEMO_LOG_EVENT_REF=feat/github-aggregate-provenance \
-PIPESOR_DEMO_NLP_REF=feat/github-aggregate-provenance \
-PYTHON_BIN=/tmp/pipesor-external-v4/bin/python \
+PYTHON_BIN=/tmp/pipesor-demo-nlp/bin/python \
 bash tools/verify_local_owner_chain.sh
 ```
 
@@ -231,3 +228,8 @@ loopback Correlation endpoint. It verifies Recommendation receipt membership,
 duplicate delivery and changed-source conflict. The broker handoff uses files
 between test processes. The synthetic scope, identities and input bytes are
 local controls. This scenario requires neither provider acquisition nor inference.
+
+Set `PIPESOR_DEMO_REVIEW=1` and use the existing Chromium checker described above
+to verify the aggregate locator in the diagnostic UI. This also reconstructs the
+admitted diagnosis from PostgreSQL through the scoped P3 route and checks that
+replaying the admission skips retrieval and inference.

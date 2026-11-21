@@ -22,7 +22,8 @@ esac
 case "$rag_mode" in fixture|hybrid|pgvector-fixture) ;; *) exit 2 ;; esac
 review_fixture=no-review
 if [[ "${PIPESOR_DEMO_REVIEW:-0}" == 1 ]]; then
-    if [[ "$scenario:$rag_mode:$llm_mode" != E02:pgvector-fixture:fixture ]]; then
+    if [[ "$scenario:$rag_mode:$llm_mode" != E02:pgvector-fixture:fixture &&
+          "$scenario:$rag_mode:$llm_mode" != synthetic-aggregate:fixture:fixture ]]; then
         [[ "$scenario:$rag_mode:$llm_mode" == E02:hybrid:foundry ]] || exit 2
         if [[ "${PIPESOR_DEMO_FOUNDRY_REVIEW_APPROVED:-0}" != 1 ]]; then
             echo "Managed E02 review requires explicit inference-budget approval" >&2
@@ -102,7 +103,7 @@ case "$scenario" in
         cp "$PIPESOR_DEMO_EXTERNAL_INPUT/log.txt" "$resources/checkout-failure.log"
         ;;
     synthetic-aggregate)
-        [[ "$rag_mode:$llm_mode:$review_fixture" == fixture:fixture:no-review ]] || exit 2
+        [[ "$rag_mode:$llm_mode" == fixture:fixture ]] || exit 2
         stage ingestion-normalization-service "${PIPESOR_DEMO_INGESTION_REF:-main}"
         producer="$fixture/ingestion-normalization-service"
         (cd "$producer" && ./mvnw -B -ntp -Dpipesor.test.exportAggregate=true \

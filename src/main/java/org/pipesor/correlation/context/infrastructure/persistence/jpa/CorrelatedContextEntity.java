@@ -37,6 +37,8 @@ class CorrelatedContextEntity {
     private String signalSummary;
     @Column(name = "signal_content", nullable = false, columnDefinition = "text")
     private String signalContent;
+    @Column(name = "signal_source_locator", columnDefinition = "text")
+    private String signalSourceLocator;
 
     @Column(name = "scope_tenant_id", nullable = false)
     private UUID scopeTenantId;
@@ -65,6 +67,7 @@ class CorrelatedContextEntity {
         this.signalStage = signal.stage();
         this.signalSummary = signal.summary();
         this.signalContent = signal.content();
+        this.signalSourceLocator = signal.sourceLocator();
         this.scopeTenantId = scope.tenantId();
         this.scopeInstallationId = scope.installationId();
         this.scopeRepositoryId = scope.repositoryId();
@@ -80,6 +83,6 @@ class CorrelatedContextEntity {
     String correlationId() { return correlationId; }
     Instant createdAt() { return createdAt; }
     UUID groupId() { return groupId; }
-    EvidenceSignal signal() { return new EvidenceSignal(signalStage, signalSummary, signalContent); }
+    EvidenceSignal signal() { return new EvidenceSignal(signalStage, signalSummary, signalContent, signalSourceLocator); }
     ScopeEnvelope scope() { return new ScopeEnvelope(scopeTenantId, scopeInstallationId, scopeRepositoryId, scopePipelineId, scopeRevision); }
 }
