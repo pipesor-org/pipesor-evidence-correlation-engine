@@ -195,6 +195,11 @@ class FullOwnerChainTest {
                     var changed = a.deepCopy();
                     ((ObjectNode) changed.get("evidence")).put("source_locator", locator.substring(0, locator.length() - 64) + "0".repeat(64));
                     assertThat(owners.evidenceStore.register(decode(changed).input())).isEqualTo(Registration.CONFLICT);
+                    var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
+                            a.get("correlation_id").asString(), localRead.reviewId::set);
+                    assertThat(diagnosis.evidence().getFirst().sourceLocator()).isEqualTo(locator);
+                    localRead.result.set(diagnosis);
+                    verifyDiagnosticHttp(diagnosis);
                     return;
                 }
                 var diagnosis = DemoDiagnosis.verify(jdbc, eventA.input().executionId(), eventA.input().evidenceId(),
