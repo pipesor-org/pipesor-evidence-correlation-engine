@@ -46,7 +46,8 @@ final class DemoDiagnosis {
         var signal = signals.get(0);
         var evidence = new Evidence(UUID.fromString(signal.get("evidence_id").asString()),
                 UUID.fromString(signal.get("origin_context_id").asString()), signal.get("stage").asString(),
-                signal.get("content").asString());
+                signal.get("content").asString(),
+                signal.has("source_locator") ? signal.get("source_locator").asString() : null);
         assertThat(evidence.evidenceId()).isEqualTo(expectedEvidence);
         assertThat(evidence.originContextId()).isEqualTo(context);
         var scenario = System.getProperty("pipesor.fixture.scenario", "local-checkout-dns");
