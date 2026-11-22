@@ -1,5 +1,7 @@
 package org.pipesor.correlation.context.infrastructure.delivery;
 
+import org.pipesor.correlation.shared.security.TransportPolicy;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -223,12 +225,12 @@ class HttpRecommendationDeliveryTest {
         for (String endpoint : List.of("http://127.0.0.1:8080", "https://user:private@example.invalid",
                 "https://example.invalid/path", "https://example.invalid?token=private", "https://example.invalid#private")) {
             assertThrows(IllegalArgumentException.class,
-                    () -> new HttpRecommendationDelivery(URI.create(endpoint), 1_000, 1_000, Duration.ofSeconds(1)));
+                    () -> new HttpRecommendationDelivery(URI.create(endpoint), 1_000, 1_000, Duration.ofSeconds(1), TransportPolicy.forProfiles("azure")));
         }
         assertThrows(IllegalArgumentException.class,
-                () -> new HttpRecommendationDelivery(URI.create("https://example.invalid"), 0, 1, Duration.ofSeconds(1)));
+                () -> new HttpRecommendationDelivery(URI.create("https://example.invalid"), 0, 1, Duration.ofSeconds(1), TransportPolicy.forProfiles("azure")));
         assertThrows(IllegalArgumentException.class,
-                () -> new HttpRecommendationDelivery(URI.create("https://example.invalid"), 1, 1, Duration.ZERO));
+                () -> new HttpRecommendationDelivery(URI.create("https://example.invalid"), 1, 1, Duration.ZERO, TransportPolicy.forProfiles("azure")));
     }
 
     private static void failure(HttpRecommendationDelivery client, tools.jackson.databind.JsonNode fixture, Failure.Kind kind) {
@@ -273,7 +275,7 @@ class HttpRecommendationDeliveryTest {
 
         URI uri() { return URI.create("http://127.0.0.1:" + server.getAddress().getPort()); }
         HttpRecommendationDelivery client(int request, int response, Duration timeout) {
-            return new HttpRecommendationDelivery(uri(), request, response, timeout, true);
+            return new HttpRecommendationDelivery(uri(), request, response, timeout, TransportPolicy.forProfiles("local"));
         }
         @Override public void close() { server.stop(0); executor.shutdownNow(); }
     }

@@ -1,5 +1,7 @@
 package org.pipesor.correlation.context.infrastructure.validation;
 
+import org.pipesor.correlation.shared.security.TransportPolicy;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -91,7 +93,7 @@ class HttpOwnerReferencesTest {
         }
         var origin = URI.create("http://127.0.0.1");
         assertThrows(IllegalArgumentException.class, () ->
-                new HttpOwnerReferences(origin, origin, (owner, time) -> validToken(owner), Duration.ofSeconds(1), 4096, 1024));
+                new HttpOwnerReferences(origin, origin, (owner, time) -> validToken(owner), Duration.ofSeconds(1), 4096, 1024, TransportPolicy.forProfiles("azure")));
     }
 
     private static Token validToken(Owner owner) {
@@ -128,7 +130,7 @@ class HttpOwnerReferencesTest {
 
         HttpOwnerReferences client(java.util.function.Function<Owner, Token> tokens) {
             return new HttpOwnerReferences(origin, origin, (owner, remaining) -> tokens.apply(owner),
-                    Duration.ofSeconds(4), 4096, 1024, Clock.systemUTC(), true);
+                    Duration.ofSeconds(4), 4096, 1024, Clock.systemUTC(), TransportPolicy.forProfiles("local"));
         }
 
         private void respond(HttpExchange exchange, Owner owner, String behavior, AtomicReference<JsonNode> seen) throws IOException {

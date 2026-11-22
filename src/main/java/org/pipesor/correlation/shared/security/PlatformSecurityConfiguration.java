@@ -9,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -17,13 +18,20 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.server.resource.BearerTokenErrors;
+
 import java.time.Clock;
+import java.util.Collections;
 
 /**
  * Shared composition of the platform identity contract: signing key, workload token issuance,
  * token verification and the stateless filter chain. Services contribute only their routes.
  */
 @Configuration(proxyBeanMethods = false)
+@EnableWebSecurity
 @EnableConfigurationProperties(PlatformSecurityProperties.class)
 public class PlatformSecurityConfiguration {
 
@@ -68,8 +76,8 @@ public class PlatformSecurityConfiguration {
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                         .accessDeniedHandler(new AccessDeniedHandlerImpl()))
-                .oauth2ResourceServer(server -> server.jwt(jwt -> jwt.decoder(platformJwtDecoder)
-                        .jwtAuthenticationConverter(PlatformAuthorities.converter())))
+                .oauth2ResourceServer(server -> server.bearerTokenResolver(PlatformSecurityConfiguration::singleBearer)
+                        .jwt(jwt -> jwt.decoder(platformJwtDecoder).jwtAuthenticationConverter(PlatformAuthorities.converter())))
                 .authorizeHttpRequests(requests -> {
                     requests.requestMatchers(HttpMethod.GET, JwksController.PATH, "/actuator/health/liveness",
                             "/actuator/health/readiness").permitAll();
@@ -77,5 +85,16 @@ public class PlatformSecurityConfiguration {
                     requests.anyRequest().denyAll();
                 });
         return http.build();
+    }
+
+    /** Accepts exactly one Authorization header carrying one bearer token; never query or form tokens. */
+    static String singleBearer(HttpServletRequest request) {
+        var values = Collections.list(request.getHeaders(HttpHeaders.AUTHORIZATION));
+        if (values.isEmpty()) return null;
+        if (values.size() > 1 || !values.getFirst().regionMatches(true, 0, "Bearer ", 0, 7)
+                || !values.getFirst().substring(7).matches("[A-Za-z0-9._~+/-]+=*")) {
+            throw new OAuth2AuthenticationException(BearerTokenErrors.invalidRequest("Exactly one bearer token is required"));
+        }
+        return values.getFirst().substring(7);
     }
 }

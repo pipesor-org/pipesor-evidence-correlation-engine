@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import org.pipesor.correlation.context.domain.model.valueobjects.EvidenceSignal;
+import org.pipesor.correlation.context.domain.model.valueobjects.SourceLocator;
 import org.pipesor.correlation.shared.infrastructure.json.CanonicalJson;
 import tools.jackson.databind.JsonNode;
 
@@ -43,7 +44,7 @@ public record NlpEvidenceV2(
             require(!input.startsWith("\ufeff"));
             JsonNode root = object(CanonicalJson.mapper().readTree(input));
             String version = text(root, "contract_version");
-            require("2.0".equals(version) || "2.1".equals(version));
+            require("2.0".equals(version) || "2.1".equals(version) || "2.2".equals(version));
             UUID messageId = uuid(root, "message_id");
             String trace = safeId(root, "correlation_id");
             require(messageId.toString().equals(idempotencyKey) && trace.equals(correlationId));
@@ -76,10 +77,9 @@ public record NlpEvidenceV2(
             UUID evidenceId = uuid(root, "evidence_id");
             String job = nullableText(root, "job", false);
             String locator = null;
-            if ("2.1".equals(version)) {
+            if (!"2.0".equals(version)) {
                 locator = text(root, "source_locator");
-                require(job != null && job.matches("[1-9][0-9]*") && locator.matches(
-                        "v2:job:" + job + ":member:[0-9]{1,9}_verify\\.txt:lines:([1-9][0-9]{0,8})-\\1:sha256:[0-9a-f]{64}"));
+                require(job != null && job.matches("[1-9][0-9]*") && SourceLocator.valid(locator, job));
             } else { require(!root.has("source_locator")); }
             Long sequence = sequence(root);
             var signal = new EvidenceSignal(text(root, "stage"), text(root, "sanitized_summary"),
