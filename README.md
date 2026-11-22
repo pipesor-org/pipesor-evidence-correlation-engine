@@ -177,52 +177,12 @@ current authority remain explicit pending decisions in the candidate record.
 
 ### Retired merged-classpath harness
 
-`tools/local-handoff`, `tools/verify_local_*.sh` and `tools/preliminary/run.py`
-compose services by copying classes into one test classpath. They target the
-pre-runtime composition (JDK handler, loopback test constructors) and no longer
-build against this checkout; their recorded results in `docs/` remain historical
-evidence. End-to-end checks now run the real services against the shared local
-stack. Replacing or removing these tools is tracked separately.
-
-### Local handoff to Recommendation (historical)
-
-With Java 25, Docker and a sibling checkout of Recommendation, run:
-
-```bash
-bash tools/verify_local_recommendation_handoff.sh
-```
-
-Pass a checkout path as the first argument if Recommendation is elsewhere. The
-runner prints the peer's local `main` revision, stages it in a temporary directory
-and exercises both services' durable stores with disposable PostgreSQL 17.11.
-It uses the actual Correlation client and Recommendation HTTP route. The
-loopback proxy drops the first receipt after Recommendation commits, then lets
-the replay recover `duplicate` for the same operation. The fixture supplies
-synthetic owner decisions, credentials and limits. It checks the handoff in
-isolation from the signed NLP route, live authorities and Azure.
-
-### Local diagnostic demonstration (historical)
-
-Run `bash tools/verify_local_owner_chain.sh` with Java 25, Docker and a Python
-environment containing the NLP and RAG dependencies. The [demonstration guide](docs/local-diagnostic-demo.md)
-covers the companion Recommendation checkout, synthetic input, verified output,
-and evaluation boundaries. The [preliminary scenario runbook](docs/preliminary-validation-increment-2.md)
-covers the three synthetic cases using the same owner chain.
-
-For documentation, check affected links and consistency with referenced sources,
-then run:
-
-```bash
-git diff --check
-```
-
-For TOML configuration changes, run this syntax check with Python 3.11+ (the selected Python baseline supports `tomllib`):
-
-```bash
-python3 -c 'from pathlib import Path; import tomllib; [tomllib.loads(p.read_text()) for p in Path(".codex").rglob("*.toml")]; print("TOML syntax OK")'
-```
-
-Follow the organization [contribution policy](https://github.com/pipesor-org/.github/blob/main/CONTRIBUTING.md), [code of conduct](https://github.com/pipesor-org/.github/blob/main/CODE_OF_CONDUCT.md) and [security policy](https://github.com/pipesor-org/.github/blob/main/SECURITY.md). Licensing remains pending.
+The former harness (`tools/local-handoff`, `tools/verify_local_*.sh`,
+`tools/preliminary/run.py` and `external.py`) composed several services in one test
+classpath. It was retired on 2026-11-22; its dated results in `docs/` remain
+historical evidence reproducible from commit `25ad9c7`. End-to-end checks run the real
+services against the shared local stack. Scenario manifests and fixtures under
+`tools/preliminary/` are kept for the evaluation protocol.
 
 ## Optional Codex setup
 
