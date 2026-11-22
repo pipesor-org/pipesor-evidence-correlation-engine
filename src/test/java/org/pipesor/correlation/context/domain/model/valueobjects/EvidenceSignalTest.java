@@ -29,4 +29,18 @@ class EvidenceSignalTest {
             assertThat(failure.getCause()).isNull();
         }
     }
+
+    @Test
+    void acceptsProtectedEvidence22LocatorsAndRejectsUnsafeOnes() {
+        String digest = "28a1babbb7adec8029801c6eaefd85584e1f485b7f831e8926192dfd2bdc0613";
+        // The authentic run 43055757606 produced a 31-line aggregate range under protected evidence 2.2.
+        var signal = new EvidenceSignal("INFRASTRUCTURE", "safe", "safe",
+                "v2:job:130644639649:member:0_verify.txt:lines:1-31:sha256:" + digest);
+        assertThat(signal.sourceLocator()).endsWith(digest);
+        new EvidenceSignal("TESTING", "safe", "safe", "v2:job:7:member:build%2F3_Run%20mvn%20test.txt:lines:10-40:sha256:" + digest);
+        for (var locator : List.of("v2:job:7:member:..%2Fa.txt:lines:1-1:sha256:" + digest,
+                "v2:job:7:member:a.txt:lines:9-1:sha256:" + digest, "v1:job:7:step:1:index:0")) {
+            assertThrows(IllegalArgumentException.class, () -> new EvidenceSignal("BUILD", "safe", "safe", locator));
+        }
+    }
 }
