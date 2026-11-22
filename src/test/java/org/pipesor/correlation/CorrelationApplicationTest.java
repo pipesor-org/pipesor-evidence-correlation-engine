@@ -68,6 +68,10 @@ class CorrelationApplicationTest {
         assertThat(get("/actuator/health/readiness").statusCode()).isEqualTo(200);
         assertThat(get("/actuator/health/liveness").statusCode()).isEqualTo(200);
         assertThat(get("/actuator/env").statusCode()).isIn(401, 403);
+        assertThat(get("/.well-known/oauth-protected-resource").statusCode()).isEqualTo(404);
+        var logout = HTTP.send(HttpRequest.newBuilder(URI.create(base + "/logout")).POST(HttpRequest.BodyPublishers.noBody()).build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(logout.statusCode()).isIn(401, 403);
     }
 
     @Test
