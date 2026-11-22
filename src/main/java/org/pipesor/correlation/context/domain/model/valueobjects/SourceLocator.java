@@ -15,6 +15,13 @@ public final class SourceLocator {
 
     private SourceLocator() { }
 
+    /** True when the locator is valid for its own job id; callers that know the authenticated job use {@link #valid}. */
+    public static boolean validShape(String locator) {
+        if (locator == null) return false;
+        var match = SHAPE.matcher(locator);
+        return match.matches() && valid(locator, match.group(1));
+    }
+
     /** True when the locator is valid and names the given authenticated job id. */
     public static boolean valid(String locator, String job) {
         if (locator == null || job == null) return false;

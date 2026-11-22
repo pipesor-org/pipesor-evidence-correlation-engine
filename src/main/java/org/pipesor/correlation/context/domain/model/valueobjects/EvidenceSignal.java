@@ -12,8 +12,7 @@ public record EvidenceSignal(String stage, String summary, String content, Strin
                 || content == null || content.isBlank()) {
             throw new IllegalArgumentException("Valid protected evidence signal is required");
         }
-        if (sourceLocator != null && !sourceLocator.matches(
-                "v2:job:[1-9][0-9]*:member:[0-9]{1,9}_verify\\.txt:lines:([1-9][0-9]{0,8})-\\1:sha256:[0-9a-f]{64}")) {
+        if (sourceLocator != null && !SourceLocator.validShape(sourceLocator)) {
             throw new IllegalArgumentException("Valid protected evidence signal is required");
         }
     }
