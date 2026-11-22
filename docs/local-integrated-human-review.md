@@ -1,5 +1,7 @@
 # Integrated diagnostic core · Local verification
 
+> **Historical record.** The merged-classpath harness this page uses (`tools/local-handoff`, `tools/verify_local_*.sh`, `tools/preliminary/run.py` and `external.py`) was retired on 2026-11-22 when the services became real runtimes (ADR-022). Its results stay valid as dated evidence; reproduce them from commit `25ad9c7` of this repository. Scenario manifests and fixtures under `tools/preliminary/` are kept.
+
 ## Boundaries and traceability
 
 - Main already contains Recommendation PR #10 and Frontend PR #21. Their GitHub checks passed. New work branches from those merged revisions.

@@ -2,6 +2,7 @@ package org.pipesor.correlation.context.infrastructure.validation;
 
 import org.pipesor.correlation.context.interfaces.rest.transform.NlpEvidenceV2;
 import org.pipesor.correlation.shared.infrastructure.json.CanonicalJson;
+import org.pipesor.correlation.shared.security.TransportPolicy;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -52,15 +53,16 @@ public final class HttpOwnerReferences implements AutoCloseable {
     private final Duration timeout;
     private final HttpClient http;
 
-    public HttpOwnerReferences(URI pipeline, URI logEvent, TokenSource tokens,
-            Duration timeout, int maxRequestBytes, int maxResponseBytes) {
-        this(pipeline, logEvent, tokens, timeout, maxRequestBytes, maxResponseBytes, Clock.systemUTC(), false);
+    public HttpOwnerReferences(URI pipeline, URI logEvent, TokenSource tokens, Duration timeout,
+            int maxRequestBytes, int maxResponseBytes, TransportPolicy transport) {
+        this(pipeline, logEvent, tokens, timeout, maxRequestBytes, maxResponseBytes, Clock.systemUTC(), transport);
     }
 
-    HttpOwnerReferences(URI pipeline, URI logEvent, TokenSource tokens,
-            Duration timeout, int maxRequestBytes, int maxResponseBytes, Clock clock, boolean loopbackTest) {
-        this.pipeline = endpoint(pipeline, OPERATIONAL_PATH, loopbackTest);
-        this.logEvent = endpoint(logEvent, MEMBERSHIP_PATH, loopbackTest);
+    HttpOwnerReferences(URI pipeline, URI logEvent, TokenSource tokens, Duration timeout,
+            int maxRequestBytes, int maxResponseBytes, Clock clock, TransportPolicy transport) {
+        Objects.requireNonNull(transport);
+        this.pipeline = endpoint(pipeline, OPERATIONAL_PATH, transport);
+        this.logEvent = endpoint(logEvent, MEMBERSHIP_PATH, transport);
         this.tokens = Objects.requireNonNull(tokens);
         this.clock = Objects.requireNonNull(clock);
         if (timeout == null || timeout.isZero() || timeout.isNegative() || maxRequestBytes < 1 || maxResponseBytes < 1) {
@@ -170,14 +172,13 @@ public final class HttpOwnerReferences implements AutoCloseable {
         return scopeFields(input, captureRevision).put("evidenceId", evidenceId.toString()).put("source", input.source());
     }
 
-    private static URI endpoint(URI origin, String path, boolean loopbackTest) {
-        if (origin == null || origin.getHost() == null || origin.getRawUserInfo() != null
-                || origin.getRawQuery() != null || origin.getRawFragment() != null
-                || !List.of("", "/").contains(origin.getRawPath())
-                || !("https".equals(origin.getScheme()) || loopbackTest && "http".equals(origin.getScheme())
-                && "127.0.0.1".equals(origin.getHost()))) {
+    private static URI endpoint(URI origin, String path, TransportPolicy transport) {
+        try {
+            transport.require(origin);
+        } catch (IllegalArgumentException rejected) {
             throw new IllegalArgumentException("Explicit owner HTTPS origin required");
         }
+        if (!List.of("", "/").contains(origin.getRawPath())) throw new IllegalArgumentException("Explicit owner HTTPS origin required");
         return origin.resolve(path);
     }
 

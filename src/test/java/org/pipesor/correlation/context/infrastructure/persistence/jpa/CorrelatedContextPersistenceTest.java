@@ -9,7 +9,9 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.pipesor.correlation.CorrelationApplication;
+import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -27,6 +29,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class CorrelatedContextPersistenceTest {
+    /** JPA mapping only: validates the owned physical model without the HTTP runtime. */
+    @SpringBootConfiguration
+    @EnableAutoConfiguration
+    @EntityScan(basePackageClasses = CorrelatedContextEntity.class)
+    static class JpaOnly { }
+
     private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.11");
     private static ConfigurableApplicationContext context;
     private static EntityManagerFactory entityManagers;
@@ -41,9 +49,9 @@ class CorrelatedContextPersistenceTest {
                 .table("flyway_history_local_correlation")
                 .load();
         assertThat(flyway.migrate().migrationsExecuted).isEqualTo(5);
-        context = new SpringApplicationBuilder(CorrelationApplication.class)
+        context = new SpringApplicationBuilder(JpaOnly.class)
                 .web(WebApplicationType.NONE)
-                .run("--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
+                .run("--spring.flyway.enabled=false", "--spring.datasource.url=" + POSTGRES.getJdbcUrl(),
                         "--spring.datasource.username=" + POSTGRES.getUsername(),
                         "--spring.datasource.password=" + POSTGRES.getPassword());
         entityManagers = context.getBean(EntityManagerFactory.class);

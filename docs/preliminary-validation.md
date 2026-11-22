@@ -1,5 +1,7 @@
 # Preliminary CI/CD scenario suite
 
+> **Historical record.** The merged-classpath harness this page uses (`tools/local-handoff`, `tools/verify_local_*.sh`, `tools/preliminary/run.py` and `external.py`) was retired on 2026-11-22 when the services became real runtimes (ADR-022). Its results stay valid as dated evidence; reproduce them from commit `25ad9c7` of this repository. Scenario manifests and fixtures under `tools/preliminary/` are kept.
+
 Use the [v1.1.0 scenario package](preliminary-validation-increment-2.md) for the three-case procedure and results. The v1.0.0 reference and its original evidence are recorded below.
 
 This suite supports a feasibility argument for the synthetic local diagnostic chain. It uses one executable integration fixture and ten planned external candidates. It makes no statistical, ground-truth accuracy, production deployment, or formal human-review claim.

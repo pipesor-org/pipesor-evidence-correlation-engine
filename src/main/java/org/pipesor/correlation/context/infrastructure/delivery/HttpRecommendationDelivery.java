@@ -1,5 +1,7 @@
 package org.pipesor.correlation.context.infrastructure.delivery;
 
+import org.pipesor.correlation.shared.security.TransportPolicy;
+
 import org.pipesor.correlation.context.application.ports.RecommendationDelivery;
 import org.pipesor.correlation.context.application.queries.CorrelatedRevision;
 
@@ -22,17 +24,10 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
     private final long timeoutNanos;
     private final HttpClient http;
 
-    public HttpRecommendationDelivery(URI endpoint, int maxRequestBytes, int maxResponseBytes, Duration timeout) {
-        this(endpoint, maxRequestBytes, maxResponseBytes, timeout, false);
-    }
-
-    // Only same-package synthetic HTTP tests may bypass TLS on the literal loopback address.
-    HttpRecommendationDelivery(URI endpoint, int maxRequestBytes, int maxResponseBytes, Duration timeout, boolean loopbackTest) {
-        if (endpoint == null || endpoint.getHost() == null || endpoint.getUserInfo() != null
-                || endpoint.getQuery() != null || endpoint.getFragment() != null
+    public HttpRecommendationDelivery(URI endpoint, int maxRequestBytes, int maxResponseBytes, Duration timeout,
+            TransportPolicy transport) {
+        if (endpoint == null || transport == null || !allowed(endpoint, transport)
                 || !(endpoint.getPath().isEmpty() || endpoint.getPath().equals("/"))
-                || !("https".equals(endpoint.getScheme()) || loopbackTest && "http".equals(endpoint.getScheme())
-                && "127.0.0.1".equals(endpoint.getHost()))
                 || maxRequestBytes < 1 || maxResponseBytes < 1 || timeout == null || timeout.isZero() || timeout.isNegative()) {
             throw new IllegalArgumentException("Explicit delivery endpoint and positive bounds are required");
         }
@@ -143,6 +138,15 @@ public final class HttpRecommendationDelivery implements RecommendationDelivery,
     }
 
     private static Failure unknown() { return new Failure(Failure.Kind.UNKNOWN); }
+
+    private static boolean allowed(URI endpoint, TransportPolicy transport) {
+        try {
+            transport.require(endpoint);
+            return true;
+        } catch (IllegalArgumentException rejected) {
+            return false;
+        }
+    }
 
     @Override public void close() { http.close(); }
 }

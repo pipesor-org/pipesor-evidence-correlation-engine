@@ -1,9 +1,68 @@
 spring:
-  main:
-    web-application-type: none
+  application:
+    name: pipesor-evidence-correlation-engine
+  datasource:
+    url: ${PIPESOR_DATABASE_URL}
+    username: ${PIPESOR_DATABASE_USERNAME:}
+    password: ${PIPESOR_DATABASE_PASSWORD:}
   flyway:
-    enabled: false
+    enabled: true
+    schemas: evidence
+    default-schema: evidence
+    table: flyway_history_correlation
+    baseline-on-migrate: true
+    baseline-version: "0"
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+pipesor:
+  correlation:
+    intake:
+      request-timeout: 10s
+      max-request-bytes: 65536
+      max-header-chars: 8192
+      max-in-flight: 32
+      resource-denied-status: 422
+      capacity-exceeded-status: 413
+    owners:
+      timeout: 3s
+      max-request-bytes: 8192
+      max-response-bytes: 2048
+    recommendation:
+      timeout: 5s
+      max-request-bytes: 262144
+      max-response-bytes: 4096
+
+---
+spring:
+  config:
+    activate:
+      on-profile: azure
+  datasource:
+    # Passwordless Entra authentication with the workload identity.
+    url: ${PIPESOR_DATABASE_URL}&authenticationPluginClassName=com.azure.identity.extensions.jdbc.postgresql.AzurePostgresqlAuthenticationPlugin

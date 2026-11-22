@@ -1,5 +1,7 @@
 # Registered E02 advisor run
 
+> **Historical record.** The merged-classpath harness this page uses (`tools/local-handoff`, `tools/verify_local_*.sh`, `tools/preliminary/run.py` and `external.py`) was retired on 2026-11-22 when the services became real runtimes (ADR-022). Its results stay valid as dated evidence; reproduce them from commit `25ad9c7` of this repository. Scenario manifests and fixtures under `tools/preliminary/` are kept.
+
 The existing Pipesor workflow form registers the E02 repository/workflow through Pipeline HTTP. The registered pipeline is read back and must match the unchanged E02 envelope before replay. No pipeline or repository row is seeded in this mode. The standalone registration pilot uses provider IDs `823901/918901`; this run derives its synthetic catalog and server-side GitHub facts from the original E02 envelope. The browser never supplies a permission flag. The test uses the existing signed delegated Pipeline identity and a separate P3 review credential.
 
 ## Interactive startup

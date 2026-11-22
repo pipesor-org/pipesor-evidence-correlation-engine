@@ -1,5 +1,7 @@
 # Local diagnostic demonstration
 
+> **Historical record.** The merged-classpath harness this page uses (`tools/local-handoff`, `tools/verify_local_*.sh`, `tools/preliminary/run.py` and `external.py`) was retired on 2026-11-22 when the services became real runtimes (ADR-022). Its results stay valid as dated evidence; reproduce them from commit `25ad9c7` of this repository. Scenario manifests and fixtures under `tools/preliminary/` are kept.
+
 For the interactive registered-workflow journey, use the [registered E02 advisor run](registered-e02-advisor.md).
 
 For the manuscript property mapping and planned external cases, see the
@@ -143,7 +145,7 @@ dashboard read contract and Entra authorization remain open.
 
 ## Inspect one scenario
 
-1. Open [checkout-failure.log](../tools/local-handoff/checkout-failure.log). The
+1. Open [checkout-failure.log](https://github.com/pipesor-org/pipesor-evidence-correlation-engine/blob/25ad9c7/tools/local-handoff/checkout-failure.log). The
    synthetic GitHub Actions checkout reports `Could not resolve host: git.example.invalid`.
 2. Find `PIPESOR_DIAGNOSIS` in the log. Compare `evidence[0].content` with the
    fixture. The test reads that evidence from the committed Recommendation
@@ -153,7 +155,7 @@ dashboard read contract and Entra authorization remain open.
 3. Find the RAG server's `http_request_completed` record with HTTP 200 and the
    same correlation ID. Read the probable cause, suggested check and limitation.
    Match the cited chunk and document IDs to the synthetic knowledge fixture in
-   [serve_rag_fixture.py](../tools/local-handoff/serve_rag_fixture.py). Confirm that
+   [serve_rag_fixture.py](https://github.com/pipesor-org/pipesor-evidence-correlation-engine/blob/25ad9c7/tools/local-handoff/serve_rag_fixture.py). Confirm that
    Maven reports `Tests run: 1, Failures: 0, Errors: 0, Skipped: 0` and
    `BUILD SUCCESS`. Context IDs can differ across runs.
 
@@ -167,7 +169,7 @@ affected runner. The result leaves the cause of the name-resolution failure open
 | Correlation | `ci-investigation-204` |
 | Execution | `9306afb1-dafe-5915-bded-b9ba5237985a` |
 | Context and evidence origin | `05150e8c-d6e0-4d17-9089-540a3acd0864` |
-| Evidence | `e6988490-6322-590d-b48d-662b154b55d9`, [checkout fixture, line 1](../tools/local-handoff/checkout-failure.log#L1) |
+| Evidence | `e6988490-6322-590d-b48d-662b154b55d9`, [checkout fixture, line 1](https://github.com/pipesor-org/pipesor-evidence-correlation-engine/blob/25ad9c7/tools/local-handoff/checkout-failure.log#L1) |
 | Knowledge provenance | `fixture:runner-network-checks`, chunk `44444444-4444-4444-4444-444444444444`, document `55555555-5555-5555-5555-555555555555` |
 
 The test also exercises owner denial, a separate run attempt, duplicate

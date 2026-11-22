@@ -2,20 +2,47 @@
 
 Evidence Correlation Engine correlates protected evidence within workflow execution context, preserves provenance and delivers correlated incident context to the recommendation service. Its canonical architecture ID is `evidence_correlation_engine`; the planned runtime is Java / Spring Boot on Azure Container Apps.
 
-The local foundation contains a Java/Spring Boot Maven build, a non-web bootstrap,
-the owned Flyway migrations and snapshot JPA mapping, a pure domain grouping rule
-and an internal transactional store for cumulative snapshots, source receipts
-and group confirmation. Each revision freezes the newly introduced evidence
-signal once; an internal read reconstructs the exact signals of an older revision.
-The approved scope increment also freezes each snapshot's historical tenant,
-installation, repository, optional pipeline and scope revision. This stored
-envelope does not establish current authorization.
-The [explicit NLP receiver composition](docs/deployment-contract.md#local-signed-nlp-receiver)
-binds a configured workload and capture scope, checks both owners before
-preparation, and confirms Recommendation's receipt before returning success.
-The default startup stays non-web. Environment identities, budgets, and the
-remaining response and broker policies are activation inputs.
-No container image or release automation is introduced.
+The service runs as a Spring Boot web application (profiles `local` and `azure`)
+that receives sanitized NLP output on `POST /internal/v1/processed-evidence`,
+checks the operational reference with Pipeline and evidence membership with
+Log/Event, persists the cumulative correlated snapshot in its owned `evidence`
+tables, and returns success only after Recommendation confirms the context
+(`POST /internal/v1/correlated-contexts`). Authentication follows the
+[platform identity contract](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/architecture/contracts/platform-identity-v1.md)
+(ADR-022): only the `nlp` workload with `Nlp.ProcessedEvidence.Send` may call the
+intake, and Correlation signs its own workload tokens for its three peers. The
+capture scope is bound per request from the evidence and confirmed by the owners;
+the tenant must equal `PIPESOR_TENANT_ID`. Source locators follow
+[protected evidence 2.2](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/architecture/contracts/protected-evidence-v2.2.md).
+
+## Run
+
+Configuration follows the
+[runtime manifest](https://github.com/pipesor-org/pipesor-docs/blob/main/docs/development/runtime-manifest.md).
+Locally, start the shared stack from `pipesor-workspace` (`python3 tools/local_stack.py init && python3 tools/local_stack.py up`), then:
+
+```bash
+./mvnw -B -ntp -DskipTests package
+set -a; . ~/.config/pipesor-local/env/correlation.env; set +a
+java -jar target/pipesor-evidence-correlation-engine-0.0.1-SNAPSHOT.jar
+curl -s http://127.0.0.1:8085/actuator/health/readiness
+```
+
+| Setting | Meaning |
+|---|---|
+| `PIPESOR_TENANT_ID`, `PIPESOR_WORKLOAD_ID=correlation` | environment tenant and workload identity |
+| `PIPESOR_SIGNING_KEY_FILE` (local) / `PIPESOR_SIGNING_KEY_ID` (azure) | workload signing key |
+| `PIPESOR_SECURITY_AUDIENCE` | `urn:pipesor:api:correlation` |
+| `PIPESOR_SECURITY_TRUSTEDWORKLOADS_0_{ID,JWKSURI,ROLES}` | the `nlp` caller |
+| `PIPESOR_ENDPOINTS_{PIPELINE,LOGEVENT,RECOMMENDATION}` | peer base URLs |
+| `PIPESOR_DATABASE_URL/USERNAME/PASSWORD` | PostgreSQL; under `azure` the URL must carry `?sslmode=require` and authentication uses the workload identity |
+| `pipesor.correlation.*` | intake and peer budgets (defaults in `application.yml`) |
+
+Flyway migrates the owned tables at startup with its own history table
+(`evidence.flyway_history_correlation`). Health: `/actuator/health/liveness` and
+`/actuator/health/readiness`; public keys: `/.well-known/jwks.json`. The image is
+built by `Dockerfile` from the packaged jar (uid 10001, port 8080); CI runs
+`./mvnw verify`, builds the image and publishes it from `main`.
 
 ## Documentation
 
@@ -148,45 +175,14 @@ Boot-managed Jackson databind. Payload and
 response budgets, cumulative overflow disposition, retry/deadline policy and
 current authority remain explicit pending decisions in the candidate record.
 
-### Local handoff to Recommendation
+### Retired merged-classpath harness
 
-With Java 25, Docker and a sibling checkout of Recommendation, run:
-
-```bash
-bash tools/verify_local_recommendation_handoff.sh
-```
-
-Pass a checkout path as the first argument if Recommendation is elsewhere. The
-runner prints the peer's local `main` revision, stages it in a temporary directory
-and exercises both services' durable stores with disposable PostgreSQL 17.11.
-It uses the actual Correlation client and Recommendation HTTP route. The
-loopback proxy drops the first receipt after Recommendation commits, then lets
-the replay recover `duplicate` for the same operation. The fixture supplies
-synthetic owner decisions, credentials and limits. It checks the handoff in
-isolation from the signed NLP route, live authorities and Azure.
-
-### Local diagnostic demonstration
-
-Run `bash tools/verify_local_owner_chain.sh` with Java 25, Docker and a Python
-environment containing the NLP and RAG dependencies. The [demonstration guide](docs/local-diagnostic-demo.md)
-covers the companion Recommendation checkout, synthetic input, verified output,
-and evaluation boundaries. The [preliminary scenario runbook](docs/preliminary-validation-increment-2.md)
-covers the three synthetic cases using the same owner chain.
-
-For documentation, check affected links and consistency with referenced sources,
-then run:
-
-```bash
-git diff --check
-```
-
-For TOML configuration changes, run this syntax check with Python 3.11+ (the selected Python baseline supports `tomllib`):
-
-```bash
-python3 -c 'from pathlib import Path; import tomllib; [tomllib.loads(p.read_text()) for p in Path(".codex").rglob("*.toml")]; print("TOML syntax OK")'
-```
-
-Follow the organization [contribution policy](https://github.com/pipesor-org/.github/blob/main/CONTRIBUTING.md), [code of conduct](https://github.com/pipesor-org/.github/blob/main/CODE_OF_CONDUCT.md) and [security policy](https://github.com/pipesor-org/.github/blob/main/SECURITY.md). Licensing remains pending.
+The former harness (`tools/local-handoff`, `tools/verify_local_*.sh`,
+`tools/preliminary/run.py` and `external.py`) composed several services in one test
+classpath. It was retired on 2026-11-22; its dated results in `docs/` remain
+historical evidence reproducible from commit `25ad9c7`. End-to-end checks run the real
+services against the shared local stack. Scenario manifests and fixtures under
+`tools/preliminary/` are kept for the evaluation protocol.
 
 ## Optional Codex setup
 
